@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
   TrophyIcon,
@@ -10,67 +10,68 @@ import {
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
+import { hackathonService } from '../../services/hackathonService';
+import { registrationService } from '../../services/registrationService';
+import { Hackathon, Registration } from '../../types';
+import toast from 'react-hot-toast';
 
 export const CompetitionsPage: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
+  const [competitions, setCompetitions] = useState<Hackathon[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState<string | null>(null);
 
-  const competitions = [
-    {
-      id: '1',
-      title: 'Tech Hackathon 2024',
-      description: 'Build innovative solutions using cutting-edge technology',
-      startDate: new Date('2025-01-15'),
-      endDate: new Date('2025-01-17'),
-      registrationDeadline: new Date('2025-01-10'),
-      maxTeamSize: 4,
-      minTeamSize: 1,
-      status: 'upcoming' as const,
-      tags: ['Web Development', 'AI/ML', 'Mobile'],
-      prizeMoney: 50000,
-      location: 'Tech Campus',
-      registeredTeams: 45,
-      totalSlots: 100
-    },
-    {
-      id: '2',
-      title: 'AI/ML Challenge',
-      description: 'Solve real-world problems using artificial intelligence and machine learning',
-      startDate: new Date('2025-01-22'),
-      endDate: new Date('2025-01-24'),
-      registrationDeadline: new Date('2025-01-18'),
-      maxTeamSize: 3,
-      minTeamSize: 1,
-      status: 'upcoming' as const,
-      tags: ['AI/ML', 'Data Science', 'Python'],
-      prizeMoney: 75000,
-      location: 'Innovation Lab',
-      registeredTeams: 28,
-      totalSlots: 50
-    },
-    {
-      id: '3',
-      title: 'Web Development Contest',
-      description: 'Create stunning web applications with modern frameworks',
-      startDate: new Date('2025-02-05'),
-      endDate: new Date('2025-02-06'),
-      registrationDeadline: new Date('2025-02-01'),
-      maxTeamSize: 2,
-      minTeamSize: 1,
-      status: 'upcoming' as const,
-      tags: ['React', 'Node.js', 'Full Stack'],
-      prizeMoney: 30000,
-      location: 'Online',
-      registeredTeams: 67,
-      totalSlots: 80
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [hackathonsData, registrationsData] = await Promise.all([
+          hackathonService.getAllHackathons(),
+          registrationService.getRegistrations().catch(() => [])
+        ]);
+        
+        setCompetitions(hackathonsData);
+        setRegistrations(registrationsData);
+      } catch (error) {
+        console.error('Error fetching competitions:', error);
+        toast.error('Failed to load competitions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleRegister = async (hackathonId: string) => {
+    try {
+      setRegistering(hackathonId);
+      await registrationService.registerForHackathon({
+        hackathonId,
+        teamMembers: [currentUser!.id] // Single member team by default
+      });
+      
+      // Refresh registrations
+      const updatedRegistrations = await registrationService.getRegistrations();
+      setRegistrations(updatedRegistrations);
+      
+      toast.success('Registration submitted successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Registration failed');
+    } finally {
+      setRegistering(null);
     }
-  ];
+  };
 
-  const filteredCompetitions = competitions.filter(comp =>
-    comp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    comp.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredCompetitions = competitions
+    .filter(comp => comp.status === activeTab)
+    .filter(comp =>
+      comp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      comp.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -81,8 +82,9 @@ export const CompetitionsPage: React.FC = () => {
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
+  const formatDate = (date: Date | string) => {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    return dateObj.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
@@ -183,7 +185,7 @@ export const CompetitionsPage: React.FC = () => {
 
               {/* Tags */}
               <div className="flex flex-wrap gap-2 mb-4">
-                {competition.tags.map((tag) => (
+                {(competition.tags || []).map((tag) => (
                   <span key={tag} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
                     {tag}
                   </span>
@@ -194,20 +196,66 @@ export const CompetitionsPage: React.FC = () => {
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Registrations</span>
-                  <span>{competition.registeredTeams}/{competition.totalSlots}</span>
+                  <span>{competition.registeredTeams || 0}/{competition.totalSlots || 0}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-full"
-                    style={{ width: `${(competition.registeredTeams / competition.totalSlots) * 100}%` }}
+                    style={{ 
+                      width: `${competition.registeredTeams && competition.totalSlots 
+                        ? (competition.registeredTeams / competition.totalSlots) * 100 
+                        : 0}%` 
+                    }}
                   ></div>
                 </div>
               </div>
 
               {/* Action Button */}
-              <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium">
-                {currentUser?.isAdmin ? 'Manage' : 'Register Now'}
-              </button>
+              {(() => {
+                const isRegistered = registrations.some(reg => reg.hackathonId === competition.id);
+                const isLoading = registering === competition.id;
+                const isExpired = new Date() > new Date(competition.registrationDeadline);
+                
+                if (isAdmin) {
+                  return (
+                    <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium">
+                      Manage Competition
+                    </button>
+                  );
+                }
+                
+                if (isRegistered) {
+                  return (
+                    <button 
+                      disabled
+                      className="w-full px-4 py-2 bg-green-100 text-green-800 rounded-lg font-medium cursor-not-allowed"
+                    >
+                      Already Registered
+                    </button>
+                  );
+                }
+                
+                if (isExpired) {
+                  return (
+                    <button 
+                      disabled
+                      className="w-full px-4 py-2 bg-gray-100 text-gray-500 rounded-lg font-medium cursor-not-allowed"
+                    >
+                      Registration Closed
+                    </button>
+                  );
+                }
+                
+                return (
+                  <button 
+                    onClick={() => handleRegister(competition.id)}
+                    disabled={isLoading}
+                    className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Registering...' : 'Register Now'}
+                  </button>
+                );
+              })()}
             </div>
           </motion.div>
         ))}

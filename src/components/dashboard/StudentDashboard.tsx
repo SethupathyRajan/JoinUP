@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   TrophyIcon, 
   CalendarIcon, 
@@ -9,14 +10,49 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
+import { gamificationService } from '../../services/gamificationService';
+import { hackathonService } from '../../services/hackathonService';
+import { registrationService } from '../../services/registrationService';
+import { GameStats, Hackathon, Registration } from '../../types';
+import toast from 'react-hot-toast';
 
 export const StudentDashboard: React.FC = () => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
+  const [gameStats, setGameStats] = useState<GameStats | null>(null);
+  const [upcomingHackathons, setUpcomingHackathons] = useState<Hackathon[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const [statsData, hackathonsData, registrationsData] = await Promise.all([
+          gamificationService.getStats().catch(() => null),
+          hackathonService.getAllHackathons().catch(() => []),
+          registrationService.getRegistrations().catch(() => [])
+        ]);
+        
+        setGameStats(statsData);
+        // Filter for upcoming hackathons only
+        setUpcomingHackathons(hackathonsData.filter(h => h.status === 'upcoming').slice(0, 3));
+        setRegistrations(registrationsData);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const stats = [
     {
       title: 'Total Points',
-      value: currentUser?.gameStats.points || 0,
+      value: gameStats?.points || 0,
       icon: StarIcon,
       color: 'bg-yellow-500',
       bgColor: 'bg-yellow-50',
@@ -24,7 +60,7 @@ export const StudentDashboard: React.FC = () => {
     },
     {
       title: 'Current Level',
-      value: currentUser?.gameStats.level || 1,
+      value: gameStats?.level || 1,
       icon: ChartBarIcon,
       color: 'bg-green-500',
       bgColor: 'bg-green-50',
@@ -32,7 +68,7 @@ export const StudentDashboard: React.FC = () => {
     },
     {
       title: 'Participations',
-      value: currentUser?.gameStats.totalParticipations || 0,
+      value: gameStats?.totalParticipations || 0,
       icon: UserGroupIcon,
       color: 'bg-blue-500',
       bgColor: 'bg-blue-50',
@@ -40,7 +76,7 @@ export const StudentDashboard: React.FC = () => {
     },
     {
       title: 'Streak',
-      value: currentUser?.gameStats.streaks.hackathon || 0,
+      value: gameStats?.streaks?.hackathon || 0,
       icon: FireIcon,
       color: 'bg-red-500',
       bgColor: 'bg-red-50',
@@ -48,17 +84,28 @@ export const StudentDashboard: React.FC = () => {
     }
   ];
 
-  const recentActivities = [
-    { title: 'Registered for Tech Hackathon 2024', time: '2 hours ago', type: 'registration' },
-    { title: 'Earned "First Timer" badge', time: '1 day ago', type: 'achievement' },
-    { title: 'Submitted project for AI Challenge', time: '3 days ago', type: 'submission' }
-  ];
+  const recentActivities = registrations
+    .filter(reg => reg.status === 'approved' || reg.status === 'pending')
+    .slice(0, 3)
+    .map(reg => ({
+      title: `${reg.status === 'approved' ? 'Registered for' : 'Registration pending for'} ${reg.hackathonId}`,
+      time: new Date(reg.submittedAt).toLocaleDateString(),
+      type: 'registration'
+    }));
 
-  const upcomingEvents = [
-    { title: 'Tech Hackathon 2024', date: 'Jan 15, 2025', status: 'registered' },
-    { title: 'AI/ML Challenge', date: 'Jan 22, 2025', status: 'open' },
-    { title: 'Web Dev Contest', date: 'Feb 5, 2025', status: 'open' }
-  ];
+  const upcomingEvents = upcomingHackathons.map(hackathon => {
+    const isRegistered = registrations.some(reg => reg.hackathonId === hackathon.id);
+    return {
+      id: hackathon.id,
+      title: hackathon.title,
+      date: new Date(hackathon.startDate).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+      }),
+      status: isRegistered ? 'registered' : 'open'
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -143,17 +190,26 @@ export const StudentDashboard: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button className="flex items-center justify-center space-x-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors">
+          <button 
+            onClick={() => navigate('/competitions')}
+            className="flex items-center justify-center space-x-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+          >
             <TrophyIcon className="h-5 w-5 text-gray-400" />
             <span className="font-medium text-gray-700">Browse Competitions</span>
           </button>
-          <button className="flex items-center justify-center space-x-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors">
+          <button 
+            onClick={() => navigate('/leaderboard')}
+            className="flex items-center justify-center space-x-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+          >
             <UserGroupIcon className="h-5 w-5 text-gray-400" />
             <span className="font-medium text-gray-700">View Leaderboard</span>
           </button>
-          <button className="flex items-center justify-center space-x-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors">
+          <button 
+            onClick={() => navigate('/history')}
+            className="flex items-center justify-center space-x-2 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+          >
             <StarIcon className="h-5 w-5 text-gray-400" />
-            <span className="font-medium text-gray-700">Check Achievements</span>
+            <span className="font-medium text-gray-700">Check History</span>
           </button>
         </div>
       </div>

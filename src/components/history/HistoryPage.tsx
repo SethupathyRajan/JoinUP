@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DocumentTextIcon,
   CalendarIcon,
@@ -12,79 +12,55 @@ import {
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
+import { registrationService } from '../../services/registrationService';
+import { Registration } from '../../types';
+import toast from 'react-hot-toast';
 
 export const HistoryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [participationHistory, setParticipationHistory] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const participationHistory = [
-    {
-      id: '1',
-      competition: 'Tech Hackathon 2024',
-      registrationDate: new Date('2024-12-01'),
-      eventDate: new Date('2024-12-15'),
-      status: 'completed',
-      result: 'Winner',
-      team: 'Code Warriors',
-      teamMembers: ['Alice Johnson', 'Bob Smith'],
-      pointsEarned: 500,
-      badges: ['Champion', 'Team Player'],
-      certificates: ['winner-certificate.pdf'],
-      projectLinks: ['https://github.com/team/project'],
-      feedback: 'Excellent innovation and execution!'
-    },
-    {
-      id: '2',
-      competition: 'AI/ML Challenge',
-      registrationDate: new Date('2024-11-15'),
-      eventDate: new Date('2024-11-30'),
-      status: 'completed',
-      result: 'Participant',
-      team: 'Data Scientists',
-      teamMembers: ['Alice Johnson', 'Carol Davis', 'David Wilson'],
-      pointsEarned: 200,
-      badges: ['AI Explorer'],
-      certificates: ['participation-certificate.pdf'],
-      projectLinks: ['https://github.com/team/ml-project'],
-      feedback: 'Good effort, keep exploring AI concepts!'
-    },
-    {
-      id: '3',
-      competition: 'Web Development Contest',
-      registrationDate: new Date('2024-10-20'),
-      eventDate: new Date('2024-11-05'),
-      status: 'pending_approval',
-      result: 'Pending Review',
-      team: 'Web Masters',
-      teamMembers: ['Alice Johnson'],
-      pointsEarned: 0,
-      badges: [],
-      certificates: [],
-      projectLinks: ['https://github.com/team/web-project'],
-      feedback: ''
-    },
-    {
-      id: '4',
-      competition: 'Mobile App Challenge',
-      registrationDate: new Date('2024-09-10'),
-      eventDate: new Date('2024-09-25'),
-      status: 'rejected',
-      result: 'Not Selected',
-      team: 'App Builders',
-      teamMembers: ['Alice Johnson', 'Eva Martinez'],
-      pointsEarned: 0,
-      badges: [],
-      certificates: [],
-      projectLinks: [],
-      feedback: 'Application did not meet minimum requirements.'
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoading(true);
+        const data = await registrationService.getRegistrations();
+        setParticipationHistory(data);
+      } catch (error) {
+        console.error('Error fetching participation history:', error);
+        toast.error('Failed to load participation history');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHistory();
+  }, []);
+
+  const handleDownloadCertificate = async (registrationId: string) => {
+    try {
+      const blob = await registrationService.downloadCertificate(registrationId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `certificate-${registrationId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Certificate downloaded successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to download certificate');
     }
-  ];
+  };
 
   const filteredHistory = participationHistory.filter(item => {
-    const matchesSearch = item.competition.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.team.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = item.hackathonId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         item.teamName?.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
     
@@ -93,18 +69,20 @@ export const HistoryPage: React.FC = () => {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
-      case 'pending_approval': return <ClockIcon className="h-5 w-5 text-yellow-500" />;
+      case 'approved': return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+      case 'pending': return <ClockIcon className="h-5 w-5 text-yellow-500" />;
       case 'rejected': return <XCircleIcon className="h-5 w-5 text-red-500" />;
+      case 'waitlisted': return <ClockIcon className="h-5 w-5 text-blue-500" />;
       default: return <ClockIcon className="h-5 w-5 text-gray-500" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'pending_approval': return 'bg-yellow-100 text-yellow-800';
+      case 'approved': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'rejected': return 'bg-red-100 text-red-800';
+      case 'waitlisted': return 'bg-blue-100 text-blue-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -181,9 +159,10 @@ export const HistoryPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   <option value="all">All Status</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending_approval">Pending Approval</option>
+                  <option value="approved">Approved</option>
+                  <option value="pending">Pending</option>
                   <option value="rejected">Rejected</option>
+                  <option value="waitlisted">Waitlisted</option>
                 </select>
               </div>
               <div>
@@ -217,148 +196,159 @@ export const HistoryPage: React.FC = () => {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Participations</p>
-              <p className="text-2xl font-bold text-gray-900">{participationHistory.length}</p>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+              <div className="h-16 bg-gray-200 rounded"></div>
             </div>
-            <DocumentTextIcon className="h-8 w-8 text-blue-500" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Participations</p>
+                <p className="text-2xl font-bold text-gray-900">{participationHistory.length}</p>
+              </div>
+              <DocumentTextIcon className="h-8 w-8 text-blue-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Approved</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {participationHistory.filter(p => p.status === 'approved').length}
+                </p>
+              </div>
+              <CheckCircleIcon className="h-8 w-8 text-green-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {participationHistory.filter(p => p.status === 'pending').length}
+                </p>
+              </div>
+              <ClockIcon className="h-8 w-8 text-yellow-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {participationHistory.length > 0 ? Math.round((participationHistory.filter(p => p.status === 'approved').length / participationHistory.length) * 100) : 0}%
+                </p>
+              </div>
+              <TrophyIcon className="h-8 w-8 text-purple-500" />
+            </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Wins</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                {participationHistory.filter(p => p.result === 'Winner').length}
-              </p>
-            </div>
-            <TrophyIcon className="h-8 w-8 text-yellow-500" />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Points</p>
-              <p className="text-2xl font-bold text-green-600">
-                {participationHistory.reduce((sum, p) => sum + p.pointsEarned, 0)}
-              </p>
-            </div>
-            <CheckCircleIcon className="h-8 w-8 text-green-500" />
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Success Rate</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {Math.round((participationHistory.filter(p => p.status === 'completed').length / participationHistory.length) * 100)}%
-              </p>
-            </div>
-            <CalendarIcon className="h-8 w-8 text-purple-500" />
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* History List */}
       <div className="space-y-4">
-        {filteredHistory.map((item, index) => (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow"
-          >
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">{item.competition}</h3>
-                    <p className="text-gray-600">Team: {item.team}</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {getStatusIcon(item.status)}
-                    <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(item.status)}`}>
-                      {item.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <CalendarIcon className="h-4 w-4" />
-                    <span>Registered: {format(item.registrationDate, 'MMM dd, yyyy')}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm text-gray-600">
-                    <CalendarIcon className="h-4 w-4" />
-                    <span>Event: {format(item.eventDate, 'MMM dd, yyyy')}</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <TrophyIcon className="h-4 w-4 text-gray-400" />
-                    <span className={getResultColor(item.result)}>{item.result}</span>
-                  </div>
-                </div>
-
-                {/* Team Members */}
-                <div className="mb-3">
-                  <p className="text-sm text-gray-600 mb-1">Team Members:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {item.teamMembers.map((member, idx) => (
-                      <span key={idx} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
-                        {member}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Points and Badges */}
-                {item.pointsEarned > 0 && (
-                  <div className="flex items-center space-x-4 mb-3">
-                    <div className="flex items-center space-x-1 text-sm">
-                      <span className="font-medium text-green-600">+{item.pointsEarned} points</span>
+        {loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 animate-pulse">
+                <div className="h-32 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          filteredHistory.map((item, index) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow"
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">{item.hackathonId}</h3>
+                      {item.teamName && <p className="text-gray-600">Team: {item.teamName}</p>}
                     </div>
-                    {item.badges.length > 0 && (
-                      <div className="flex space-x-1">
-                        {item.badges.map((badge, idx) => (
-                          <span key={idx} className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
-                            {badge}
-                          </span>
-                        ))}
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(item.status)}
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full capitalize ${getStatusColor(item.status)}`}>
+                        {item.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="flex items-center space-x-2 text-sm text-gray-600">
+                      <CalendarIcon className="h-4 w-4" />
+                      <span>Registered: {format(new Date(item.submittedAt), 'MMM dd, yyyy')}</span>
+                    </div>
+                    {item.reviewedAt && (
+                      <div className="flex items-center space-x-2 text-sm text-gray-600">
+                        <CalendarIcon className="h-4 w-4" />
+                        <span>Reviewed: {format(new Date(item.reviewedAt), 'MMM dd, yyyy')}</span>
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Feedback */}
-                {item.feedback && (
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-700"><strong>Feedback:</strong> {item.feedback}</p>
+                  {/* Team Members */}
+                  {item.teamMembers && item.teamMembers.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-sm text-gray-600 mb-1">Team Members:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {item.teamMembers.map((memberId, idx) => (
+                          <span key={idx} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                            Member {idx + 1}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Priority */}
+                  <div className="mb-3">
+                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+                      item.priority === 'high' ? 'bg-red-100 text-red-800' :
+                      item.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-green-100 text-green-800'
+                    }`}>
+                      {item.priority} priority
+                    </span>
                   </div>
-                )}
-              </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col space-y-2 min-w-0 lg:min-w-[120px]">
-                {item.certificates.length > 0 && (
-                  <button className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
-                    View Certificate
+                  {/* Feedback */}
+                  {item.feedback && (
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-700"><strong>Feedback:</strong> {item.feedback}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col space-y-2 min-w-0 lg:min-w-[120px]">
+                  {item.status === 'approved' && (
+                    <button 
+                      onClick={() => handleDownloadCertificate(item.id)}
+                      className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
+                    >
+                      Download Certificate
+                    </button>
+                  )}
+                  <button className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                    View Details
                   </button>
-                )}
-                {item.projectLinks.length > 0 && (
-                  <button className="px-3 py-2 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
-                    View Project
-                  </button>
-                )}
-                <button className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                  Details
-                </button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          ))
+        )}
       </div>
 
       {/* Empty State */}

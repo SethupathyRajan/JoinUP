@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { motion } from 'framer-motion';
+import brandLogo from '../../assets/brandlogo.png';
 
 export const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -12,19 +13,24 @@ export const RegisterPage: React.FC = () => {
     department: '',
     year: 1,
     rollNumber: '',
-    isAdmin: false
+    registerNumber: '',
+    phoneNumber: ''
   });
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const departments = [
-    'Computer Science & Engineering',
+    'Computer Science and Engineering',
     'Information Technology',
-    'Electronics & Communication',
+    'Electronics and Communication Engineering',
+    'Electrical and Electronics Engineering',
     'Mechanical Engineering',
     'Civil Engineering',
-    'Electrical Engineering'
+    'Artificial Intelligence and Data Science',
+    'Cyber Security',
+    'Biotechnology',
+    'Chemical Engineering'
   ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -35,12 +41,6 @@ export const RegisterPage: React.FC = () => {
     }));
   };
 
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      isAdmin: e.target.checked
-    }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,14 +51,17 @@ export const RegisterPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await register(formData.email, formData.password, {
+      await register({
+        email: formData.email,
+        password: formData.password,
         name: formData.name,
         department: formData.department,
         year: formData.year,
         rollNumber: formData.rollNumber,
-        isAdmin: formData.isAdmin
+        registerNumber: formData.registerNumber,
+        phoneNumber: formData.phoneNumber
       });
-      navigate('/dashboard');
+      navigate('/login'); // Redirect to login after successful registration
     } catch (error) {
       console.error('Registration error:', error);
     } finally {
@@ -74,8 +77,8 @@ export const RegisterPage: React.FC = () => {
         className="max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg"
       >
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-orange-400 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-bold text-xl">JU</span>
+          <div className="w-20 h-20 mx-auto mb-6 p-2 bg-white rounded-full shadow-lg flex items-center justify-center">
+            <img src={brandLogo} alt="JoinUP Logo" className="w-full h-full object-contain" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">Create Account</h2>
           <p className="mt-2 text-gray-600">Join the JoinUP community</p>
@@ -191,23 +194,52 @@ export const RegisterPage: React.FC = () => {
                 id="rollNumber"
                 name="rollNumber"
                 type="text"
+                required
                 value={formData.rollNumber}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Roll Number"
+                placeholder="e.g., 660523 or 67IT001"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="registerNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                Register Number
+              </label>
+              <input
+                id="registerNumber"
+                name="registerNumber"
+                type="text"
+                required
+                value={formData.registerNumber}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="16-digit number"
               />
             </div>
 
             <div className="col-span-2">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={formData.isAdmin}
-                  onChange={handleCheckboxChange}
-                  className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
-                />
-                <span className="ml-2 text-sm text-gray-700">Register as Faculty</span>
+              <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                Phone Number (Optional)
               </label>
+              <input
+                id="phoneNumber"
+                name="phoneNumber"
+                type="tel"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="e.g., +91 9876543210"
+              />
+            </div>
+
+            <div className="col-span-2">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Only students with @student.tce.edu email can register. 
+                  Faculty/Admin access is managed separately.
+                </p>
+              </div>
             </div>
           </div>
 

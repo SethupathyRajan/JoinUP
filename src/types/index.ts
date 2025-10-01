@@ -2,13 +2,17 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  isAdmin: boolean;
-  department?: string;
-  year?: number;
-  rollNumber?: string;
-  gameStats: GameStats;
+  department: string;
+  year: number;
+  rollNumber: string;
+  registerNumber: string;
+  phoneNumber: string;
+  profilePicture?: string;
+  isAdmin?: boolean;
+  gameStats?: GameStats;
   createdAt: Date;
   updatedAt: Date;
+  lastLogin?: Date;
 }
 
 export interface GameStats {
@@ -133,6 +137,7 @@ export interface LeaderboardEntry {
   totalParticipations: number;
   totalWins: number;
   rank: number;
+  isAdmin?: boolean;
 }
 
 export interface FilterOptions {
@@ -146,3 +151,7 @@ export interface FilterOptions {
   status?: string[];
   department?: string;
 }
+
+
+
+

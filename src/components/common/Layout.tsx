@@ -13,7 +13,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
-import logoSrc from '../../assets/tcelogo.png';
+import brandLogo from '../../assets/brandlogo.png';
 
 export const Layout: React.FC = () => {
   const { currentUser, logout } = useAuth();
@@ -26,6 +26,7 @@ export const Layout: React.FC = () => {
     { name: 'Competitions', href: '/competitions', icon: TrophyIcon },
     { name: 'Leaderboard', href: '/leaderboard', icon: UserGroupIcon },
     { name: 'History', href: '/history', icon: DocumentTextIcon },
+    { name: 'Profile', href: '/profile', icon: UserIcon },
     ...(currentUser?.isAdmin ? [
       { name: 'Analytics', href: '/analytics', icon: ChartBarIcon }
     ] : [])
@@ -56,10 +57,8 @@ export const Layout: React.FC = () => {
       {/* Sidebar */}
       <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
-          <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-orange-400 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">JU</span>
-            </div>
+          <div className="flex items-center space-x-3">
+            <img src={brandLogo} alt="JoinUP Logo" className="h-8 w-8 object-contain" />
             <span className="text-xl font-bold text-gray-900">JoinUP</span>
           </div>
           <button
@@ -132,7 +131,7 @@ export const Layout: React.FC = () => {
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
               </button>
             </div>
-              <img src={logoSrc} alt="College Logo" className="h-12 mr-4" />
+              <img src={brandLogo} alt="JoinUP Brand Logo" className="h-10 w-auto object-contain" />
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   TrophyIcon, 
   StarIcon, 
@@ -7,78 +7,32 @@ import {
   MagnifyingGlassIcon 
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
+import { gamificationService } from '../../services/gamificationService';
+import { LeaderboardEntry } from '../../types';
+import toast from 'react-hot-toast';
 
 export const LeaderboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overall');
   const [searchQuery, setSearchQuery] = useState('');
+  const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const leaderboardData = [
-    {
-      rank: 1,
-      userId: '1',
-      userName: 'Alice Johnson',
-      department: 'Computer Science & Engineering',
-      year: 3,
-      points: 2850,
-      level: 15,
-      totalParticipations: 12,
-      totalWins: 8,
-      streak: 15,
-      badges: ['Champion', 'AI Master', 'Code Warrior']
-    },
-    {
-      rank: 2,
-      userId: '2',
-      userName: 'Bob Smith',
-      department: 'Information Technology',
-      year: 4,
-      points: 2650,
-      level: 14,
-      totalParticipations: 10,
-      totalWins: 6,
-      streak: 12,
-      badges: ['Web Expert', 'Team Player', 'Innovation']
-    },
-    {
-      rank: 3,
-      userId: '3',
-      userName: 'Carol Davis',
-      department: 'Computer Science & Engineering',
-      year: 2,
-      points: 2400,
-      level: 12,
-      totalParticipations: 9,
-      totalWins: 5,
-      streak: 8,
-      badges: ['Rising Star', 'Data Scientist', 'Consistent']
-    },
-    {
-      rank: 4,
-      userId: '4',
-      userName: 'David Wilson',
-      department: 'Electronics & Communication',
-      year: 3,
-      points: 2150,
-      level: 11,
-      totalParticipations: 8,
-      totalWins: 4,
-      streak: 6,
-      badges: ['Hardware Guru', 'Problem Solver']
-    },
-    {
-      rank: 5,
-      userId: '5',
-      userName: 'Eva Martinez',
-      department: 'Information Technology',
-      year: 1,
-      points: 1950,
-      level: 10,
-      totalParticipations: 7,
-      totalWins: 3,
-      streak: 10,
-      badges: ['Newcomer', 'Fast Learner']
-    }
-  ];
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        const data = await gamificationService.getLeaderboard();
+        setLeaderboardData(data);
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        toast.error('Failed to load leaderboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [activeTab]); // Refetch when tab changes
 
   const filteredData = leaderboardData.filter(user =>
     user.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -286,7 +240,7 @@ export const LeaderboardPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-wrap gap-1">
-                      {user.badges.slice(0, 2).map((badge, badgeIndex) => (
+                      {(user.badges || []).slice(0, 2).map((badge, badgeIndex) => (
                         <span
                           key={badgeIndex}
                           className={`px-2 py-1 text-xs font-medium rounded-full ${getBadgeColor(badge)}`}
@@ -294,9 +248,9 @@ export const LeaderboardPage: React.FC = () => {
                           {badge}
                         </span>
                       ))}
-                      {user.badges.length > 2 && (
+                      {(user.badges?.length || 0) > 2 && (
                         <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">
-                          +{user.badges.length - 2}
+                          +{(user.badges?.length || 0) - 2}
                         </span>
                       )}
                     </div>

@@ -9,6 +9,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { CompetitionsPage } from './components/competitions/CompetitionsPage';
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage';
 import { HistoryPage } from './components/history/HistoryPage';
+import ProfilePage from './components/profile/ProfilePage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, loading } = useAuth();
@@ -67,6 +68,7 @@ function App() {
               <Route path="competitions" element={<CompetitionsPage />} />
               <Route path="leaderboard" element={<LeaderboardPage />} />
               <Route path="history" element={<HistoryPage />} />
+              <Route path="profile" element={<ProfilePage />} />
               {/* Analytics route would be added here for admin users */}
             </Route>
 
