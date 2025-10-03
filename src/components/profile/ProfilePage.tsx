@@ -1,24 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import {
-  User,
-  Settings,
-  Trophy,
-  Target,
-  Calendar,
-  Mail,
-  Phone,
-  GraduationCap,
-  Hash,
-  Edit3,
-  Save,
-  X,
-  Lock,
-  Shield,
-  Eye,
-  EyeOff,
-  ArrowLeft
-} from 'lucide-react';
+import { User, Settings, Trophy, Target, Calendar, Mail, Phone, GraduationCap, Hash, CreditCard as Edit3, Save, X, Lock, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { gamificationService } from '../../services/gamificationService';
