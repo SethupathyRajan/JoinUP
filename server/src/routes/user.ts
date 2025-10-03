@@ -7,33 +7,96 @@ import { updateStreaks } from '../services/gamification.js';
 
 const router = express.Router();
 
-// Get user profile
-router.get('/:userId', authenticateToken, requireOwnershipOrAdmin('userId'), async (req, res) => {
+// Get user public profile (anyone can view)
+router.get('/:userId/profile', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const userDoc = await db.collection('users').doc(userId).get();
-    
+
     if (!userDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-    
+
     const userData = userDoc.data() as User;
-    
+
+    const sanitizedUser = {
+      id: userData.id,
+      name: userData.name,
+      email: userData.email,
+      department: userData.department,
+      year: userData.year,
+      rollNumber: userData.rollNumber,
+      registerNumber: userData.registerNumber,
+      profilePicture: userData.profilePicture,
+      createdAt: userData.createdAt
+    };
+
+    const response: ApiResponse<{
+      user: any;
+      gameStats: any;
+      achievements: any[];
+      badges: any[];
+    }> = {
+      success: true,
+      data: {
+        user: sanitizedUser,
+        gameStats: userData.gameStats || {
+          points: 0,
+          level: 1,
+          totalParticipations: 0,
+          totalWins: 0,
+          badges: [],
+          streaks: { daily: 0, weekly: 0, hackathon: 0, lastUpdated: new Date() },
+          achievements: []
+        },
+        achievements: userData.gameStats?.achievements || [],
+        badges: userData.gameStats?.badges || []
+      },
+      message: 'User profile retrieved successfully'
+    };
+
+    res.json(response);
+
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get user profile'
+    });
+  }
+});
+
+// Get user profile (own profile only)
+router.get('/:userId', authenticateToken, requireOwnershipOrAdmin('userId'), async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+
+    const userData = userDoc.data() as User;
+
     // Update daily login streak
     await updateStreaks(userId, 'login');
-    
+
     const response: ApiResponse<{ user: User }> = {
       success: true,
       data: { user: userData },
       message: 'User profile retrieved successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Get user profile error:', error);
     res.status(500).json({

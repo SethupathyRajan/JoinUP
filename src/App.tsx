@@ -69,7 +69,7 @@ function App() {
               <Route path="leaderboard" element={<LeaderboardPage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="profile" element={<ProfilePage />} />
-              {/* Analytics route would be added here for admin users */}
+              <Route path="profile/:userId" element={<ProfilePage />} />
             </Route>
 
             {/* Fallback */}

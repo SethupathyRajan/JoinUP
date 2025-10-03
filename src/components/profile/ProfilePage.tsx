@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  User, 
-  Settings, 
-  Trophy, 
-  Target, 
-  Calendar, 
-  Mail, 
-  Phone, 
+import {
+  User,
+  Settings,
+  Trophy,
+  Target,
+  Calendar,
+  Mail,
+  Phone,
   GraduationCap,
   Hash,
   Edit3,
@@ -16,12 +16,16 @@ import {
   Lock,
   Shield,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowLeft
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useParams, useNavigate } from 'react-router-dom';
 import { gamificationService } from '../../services/gamificationService';
 import { registrationService } from '../../services/registrationService';
-import { GameStats, Registration } from '../../types';
+import { userProfileService } from '../../services/userProfileService';
+import { GameStats, Registration, Achievement, Badge, User as UserType } from '../../types';
+import { AchievementsSection } from './AchievementsSection';
 import toast from 'react-hot-toast';
 
 interface ProfileData {
@@ -36,10 +40,17 @@ interface ProfileData {
 
 const ProfilePage: React.FC = () => {
   const { currentUser, isAdmin } = useAuth();
+  const { userId } = useParams<{ userId: string }>();
+  const navigate = useNavigate();
+  const [viewedUser, setViewedUser] = useState<UserType | null>(null);
   const [gameStats, setGameStats] = useState<GameStats | null>(null);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [badges, setBadges] = useState<Badge[]>([]);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
+  const isViewingOwnProfile = !userId || userId === currentUser?.id;
+  const displayUser = isViewingOwnProfile ? currentUser : viewedUser;
   const [profileData, setProfileData] = useState<ProfileData>({
     name: currentUser?.name || '',
     email: currentUser?.email || '',
@@ -66,22 +77,39 @@ const ProfilePage: React.FC = () => {
 
   useEffect(() => {
     fetchProfileData();
-  }, [currentUser]);
+  }, [currentUser, userId]);
 
   const fetchProfileData = async () => {
-    if (!currentUser || isAdmin) {
+    if (isAdmin && isViewingOwnProfile) {
       setLoading(false);
       return;
     }
 
     try {
-      const [statsData, registrationsData] = await Promise.all([
-        gamificationService.getStats(),
-        registrationService.getUserRegistrations()
-      ]);
+      if (isViewingOwnProfile) {
+        const [statsData, registrationsData, achievementsData, badgesData] = await Promise.all([
+          gamificationService.getStats(),
+          registrationService.getUserRegistrations(),
+          gamificationService.getAchievements(),
+          gamificationService.getBadges()
+        ]);
 
-      setGameStats(statsData);
-      setRegistrations(registrationsData);
+        setGameStats(statsData);
+        setRegistrations(registrationsData);
+        setAchievements(achievementsData);
+        setBadges(badgesData);
+      } else {
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        const profileData = await userProfileService.getUserProfile(userId);
+        setViewedUser(profileData.user);
+        setGameStats(profileData.gameStats);
+        setAchievements(profileData.achievements);
+        setBadges(profileData.badges);
+      }
     } catch (error) {
       console.error('Error fetching profile data:', error);
       toast.error('Failed to load profile data');
@@ -408,6 +436,16 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {!isViewingOwnProfile && (
+          <button
+            onClick={() => navigate('/leaderboard')}
+            className="mb-4 flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Leaderboard
+          </button>
+        )}
+
         {/* Profile Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -421,8 +459,8 @@ const ProfilePage: React.FC = () => {
                   <User className="h-10 w-10 text-gray-600" />
                 </div>
                 <div className="ml-6">
-                  <h1 className="text-2xl font-bold text-white">{currentUser?.name}</h1>
-                  <p className="text-blue-100">{currentUser?.email}</p>
+                  <h1 className="text-2xl font-bold text-white">{displayUser?.name}</h1>
+                  <p className="text-blue-100">{displayUser?.email}</p>
                   {gameStats && (
                     <div className="mt-2">
                       <span className="bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-sm font-semibold">
@@ -432,22 +470,24 @@ const ProfilePage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <button
-                onClick={editMode ? handleSaveProfile : handleEditProfile}
-                className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors flex items-center"
-              >
-                {editMode ? (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                ) : (
-                  <>
-                    <Edit3 className="h-4 w-4 mr-2" />
-                    Edit Profile
-                  </>
-                )}
-              </button>
+              {isViewingOwnProfile && (
+                <button
+                  onClick={editMode ? handleSaveProfile : handleEditProfile}
+                  className="bg-white text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors flex items-center"
+                >
+                  {editMode ? (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </>
+                  ) : (
+                    <>
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -486,7 +526,7 @@ const ProfilePage: React.FC = () => {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                {editMode ? (
+                {editMode && isViewingOwnProfile ? (
                   <input
                     type="text"
                     value={profileData.name}
@@ -494,7 +534,7 @@ const ProfilePage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 ) : (
-                  <p className="text-gray-900 font-medium">{currentUser?.name}</p>
+                  <p className="text-gray-900 font-medium">{displayUser?.name}</p>
                 )}
               </div>
 
@@ -502,13 +542,13 @@ const ProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <div className="flex items-center text-gray-500">
                   <Mail className="h-4 w-4 mr-2" />
-                  <span>{currentUser?.email}</span>
+                  <span>{displayUser?.email}</span>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                {editMode ? (
+                {editMode && isViewingOwnProfile ? (
                   <select
                     value={profileData.department}
                     onChange={(e) => setProfileData({ ...profileData, department: e.target.value })}
@@ -523,14 +563,14 @@ const ProfilePage: React.FC = () => {
                 ) : (
                   <div className="flex items-center">
                     <GraduationCap className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="text-gray-900">{currentUser?.department}</span>
+                    <span className="text-gray-900">{displayUser?.department}</span>
                   </div>
                 )}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                {editMode ? (
+                {editMode && isViewingOwnProfile ? (
                   <select
                     value={profileData.year}
                     onChange={(e) => setProfileData({ ...profileData, year: parseInt(e.target.value) })}
@@ -544,7 +584,7 @@ const ProfilePage: React.FC = () => {
                 ) : (
                   <div className="flex items-center">
                     <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="text-gray-900">{currentUser?.year}st Year</span>
+                    <span className="text-gray-900">{displayUser?.year}st Year</span>
                   </div>
                 )}
               </div>
@@ -553,7 +593,7 @@ const ProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
                 <div className="flex items-center text-gray-500">
                   <Hash className="h-4 w-4 mr-2" />
-                  <span>{currentUser?.rollNumber}</span>
+                  <span>{displayUser?.rollNumber}</span>
                 </div>
               </div>
 
@@ -561,13 +601,13 @@ const ProfilePage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Register Number</label>
                 <div className="flex items-center text-gray-500">
                   <Hash className="h-4 w-4 mr-2" />
-                  <span>{currentUser?.registerNumber}</span>
+                  <span>{displayUser?.registerNumber}</span>
                 </div>
               </div>
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                {editMode ? (
+                {editMode && isViewingOwnProfile ? (
                   <input
                     type="tel"
                     value={profileData.phoneNumber}
@@ -577,7 +617,7 @@ const ProfilePage: React.FC = () => {
                 ) : (
                   <div className="flex items-center">
                     <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                    <span className="text-gray-900">{currentUser?.phoneNumber || 'Not provided'}</span>
+                    <span className="text-gray-900">{displayUser?.phoneNumber || 'Not provided'}</span>
                   </div>
                 )}
               </div>
@@ -630,58 +670,71 @@ const ProfilePage: React.FC = () => {
               </motion.div>
             )}
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="bg-white rounded-lg shadow-md p-6"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Target className="h-5 w-5 mr-2 text-green-500" />
-                Competition Stats
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Registered</span>
-                  <span className="font-semibold text-blue-600">{registrations.length}</span>
+            {isViewingOwnProfile && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-white rounded-lg shadow-md p-6"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Target className="h-5 w-5 mr-2 text-green-500" />
+                  Competition Stats
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Registered</span>
+                    <span className="font-semibold text-blue-600">{registrations.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Approved</span>
+                    <span className="font-semibold text-green-600">
+                      {registrations.filter(r => r.status === 'approved').length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Pending</span>
+                    <span className="font-semibold text-yellow-600">
+                      {registrations.filter(r => r.status === 'pending').length}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Approved</span>
-                  <span className="font-semibold text-green-600">
-                    {registrations.filter(r => r.status === 'approved').length}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Pending</span>
-                  <span className="font-semibold text-yellow-600">
-                    {registrations.filter(r => r.status === 'pending').length}
-                  </span>
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="bg-white rounded-lg shadow-md p-6"
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Settings className="h-5 w-5 mr-2 text-gray-500" />
-                Account Settings
-              </h3>
-              <div className="space-y-3">
-                <button
-                  onClick={() => setChangePasswordMode(true)}
-                  className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  <Lock className="h-4 w-4 mr-2" />
-                  Change Password
-                </button>
-              </div>
-            </motion.div>
+            {isViewingOwnProfile && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-white rounded-lg shadow-md p-6"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Settings className="h-5 w-5 mr-2 text-gray-500" />
+                  Account Settings
+                </h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setChangePasswordMode(true)}
+                    className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <Lock className="h-4 w-4 mr-2" />
+                    Change Password
+                  </button>
+                </div>
+              </motion.div>
+            )}
           </div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="mt-6"
+        >
+          <AchievementsSection achievements={achievements} badges={badges} />
+        </motion.div>
 
         {/* Password Verification Modal */}
         {showPasswordModal && (

@@ -132,11 +132,14 @@ export interface LeaderboardEntry {
   userId: string;
   userName: string;
   department: string;
+  year: number;
   points: number;
   level: number;
   totalParticipations: number;
   totalWins: number;
   rank: number;
+  streak: number;
+  badges?: string[];
   isAdmin?: boolean;
 }
 

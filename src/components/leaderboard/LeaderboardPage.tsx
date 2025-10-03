@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  TrophyIcon, 
-  StarIcon, 
-  FireIcon, 
+import {
+  TrophyIcon,
+  StarIcon,
+  FireIcon,
   ChartBarIcon,
-  MagnifyingGlassIcon 
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { gamificationService } from '../../services/gamificationService';
 import { LeaderboardEntry } from '../../types';
 import toast from 'react-hot-toast';
 
 export const LeaderboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overall');
   const [searchQuery, setSearchQuery] = useState('');
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([]);
@@ -66,6 +68,10 @@ export const LeaderboardPage: React.FC = () => {
       'bg-yellow-100 text-yellow-800'
     ];
     return colors[badge.length % colors.length];
+  };
+
+  const handleUserClick = (userId: string) => {
+    navigate(`/profile/${userId}`);
   };
 
   return (
@@ -191,13 +197,14 @@ export const LeaderboardPage: React.FC = () => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: index * 0.05 }}
-                  className={`hover:bg-gray-50 ${getRankColor(user.rank)}`}
+                  className={`hover:bg-gray-50 cursor-pointer ${getRankColor(user.rank)}`}
+                  onClick={() => handleUserClick(user.userId)}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <span className="text-2xl font-bold">
-                        {typeof getRankIcon(user.rank) === 'string' && getRankIcon(user.rank).includes('🏅') ? 
-                          getRankIcon(user.rank) : 
+                        {typeof getRankIcon(user.rank) === 'string' && getRankIcon(user.rank).includes('🏅') ?
+                          getRankIcon(user.rank) :
                           `#${user.rank}`
                         }
                       </span>
@@ -209,7 +216,7 @@ export const LeaderboardPage: React.FC = () => {
                         {user.userName.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{user.userName}</div>
+                        <div className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">{user.userName}</div>
                         <div className="text-sm text-gray-500">{user.department} • Year {user.year}</div>
                       </div>
                     </div>
