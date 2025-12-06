@@ -314,7 +314,7 @@ export interface EmailTemplate {
 }
 
 export interface EmailContext {
-  userName: string;
+  userName?: string;
   hackathonTitle?: string;
   teamName?: string;
   status?: string;

@@ -1,10 +1,12 @@
 import nodemailer from 'nodemailer';
-import { EmailTemplate, EmailContext } from '../models/types.js';
-import { getEmailTemplate } from '../templates/email-templates.js';
+import { EmailTemplate, EmailContext } from '../models/types';
+import { getEmailTemplate } from '../templates/email-templates';
+
+
 
 // Create transporter
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
     secure: process.env.SMTP_SECURE === 'true',
@@ -243,38 +245,45 @@ export const sendEmail = async (options: {
   context?: EmailContext;
   html?: string;
   text?: string;
+  
 }): Promise<void> => {
   try {
     const transporter = createTransporter();
 
-    let emailContent: EmailTemplate;
+let emailContent: {
+  subject: string;
+  html: string;
+  text?: string;
+};
 
-    if (options.template && templates[options.template]) {
-      // Use template
-      const template = templates[options.template];
-      emailContent = renderTemplate(template, options.context || {});
-    } else {
-      // Use direct content
-      emailContent = {
-        subject: options.subject || 'JoinUP Notification',
-        html: options.html || '',
-        text: options.text
-      };
-    }
+if (options.template && templates[options.template]) {
+  // Use template
+  emailContent = getEmailTemplate(
+    options.template,
+    options.context || {}
+  );
+} else {
+  // Use direct content
+  emailContent = {
+    subject: options.subject || 'JoinUP Notification',
+    html: options.html || '',
+    text: options.text || ''
+  };
+}
 
-    const mailOptions = {
-      from: {
-        name: 'JoinUP Platform',
-        address: process.env.SMTP_USER!
-      },
-      to: options.to,
-      subject: emailContent.subject,
-      html: emailContent.html,
-      text: emailContent.text
-    };
+const mailOptions = {
+  from: {
+    name: 'JoinUP Platform',
+    address: process.env.SMTP_USER!
+  },
+  to: options.to,
+  subject: emailContent.subject,
+  html: emailContent.html,
+  text: emailContent.text
+};
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent successfully:', info.messageId);
+const info = await transporter.sendMail(mailOptions);
+console.log('Email sent successfully:', info.messageId);
 
   } catch (error) {
     console.error('Email send error:', error);
