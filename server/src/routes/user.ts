@@ -7,6 +7,53 @@ import { updateStreaks } from '../services/gamification.js';
 
 const router = express.Router();
 
+// Lightweight search endpoint for member lookup (roll/register/email)
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const { query = '' } = req.query as any;
+
+    if (!query || String(query).trim().length === 0) {
+      return res.json({ success: true, data: { users: [] } });
+    }
+
+    const q = String(query).toLowerCase();
+
+    const snapshot = await db.collection('users')
+      .where('rollNumber', '==', query)
+      .limit(10)
+      .get();
+
+    let results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // If none found by exact roll, try search by registerNumber or email
+    if (results.length === 0) {
+      const snap2 = await db.collection('users')
+        .where('registerNumber', '==', query)
+        .limit(10)
+        .get();
+      results = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    if (results.length === 0) {
+      // Fallback to simple startsWith search (scan small subset)
+      const allSnap = await db.collection('users').limit(1000).get();
+      const allUsers = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      results = allUsers.filter((u: any) => (
+        (u.rollNumber && String(u.rollNumber).toLowerCase().includes(q)) ||
+        (u.registerNumber && String(u.registerNumber).toLowerCase().includes(q)) ||
+        (u.email && String(u.email).toLowerCase().includes(q))
+      )).slice(0, 10);
+    }
+
+    const sanitized = results.map((u: any) => ({ id: u.id, name: u.name, email: u.email, rollNumber: u.rollNumber, registerNumber: u.registerNumber }));
+
+    res.json({ success: true, data: { users: sanitized } });
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ success: false, error: 'Failed to search users' });
+  }
+});
+
 // Get user public profile (anyone can view)
 router.get('/:userId/profile', authenticateToken, async (req, res) => {
   try {
@@ -355,6 +402,53 @@ router.get('/', authenticateToken, async (req, res) => {
       success: false,
       error: 'Failed to search users'
     });
+  }
+});
+
+// Lightweight search endpoint for member lookup (roll/register/email)
+router.get('/search', authenticateToken, async (req, res) => {
+  try {
+    const { query = '' } = req.query as any;
+
+    if (!query || String(query).trim().length === 0) {
+      return res.json({ success: true, data: { users: [] } });
+    }
+
+    const q = String(query).toLowerCase();
+
+    const snapshot = await db.collection('users')
+      .where('rollNumber', '==', query)
+      .limit(10)
+      .get();
+
+    let results = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // If none found by exact roll, try search by registerNumber or email
+    if (results.length === 0) {
+      const snap2 = await db.collection('users')
+        .where('registerNumber', '==', query)
+        .limit(10)
+        .get();
+      results = snap2.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    if (results.length === 0) {
+      // Fallback to simple startsWith search (scan small subset)
+      const allSnap = await db.collection('users').limit(1000).get();
+      const allUsers = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      results = allUsers.filter((u: any) => (
+        (u.rollNumber && String(u.rollNumber).toLowerCase().includes(q)) ||
+        (u.registerNumber && String(u.registerNumber).toLowerCase().includes(q)) ||
+        (u.email && String(u.email).toLowerCase().includes(q))
+      )).slice(0, 10);
+    }
+
+    const sanitized = results.map((u: any) => ({ id: u.id, name: u.name, email: u.email, rollNumber: u.rollNumber, registerNumber: u.registerNumber }));
+
+    res.json({ success: true, data: { users: sanitized } });
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ success: false, error: 'Failed to search users' });
   }
 });
 

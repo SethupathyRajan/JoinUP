@@ -1,15 +1,9 @@
 import { Registration } from '../types';
 import { apiRequest, API_CONFIG } from '../config/api';
 
-interface RegistrationData {
-  hackathonId: string;
-  teamName?: string;
-  teamMembers: string[];
-}
-
 export const registrationService = {
   // Register for hackathon
-  registerForHackathon: async (registrationData: RegistrationData): Promise<Registration> => {
+  registerForHackathon: async (registrationData: any): Promise<Registration> => {
     const response = await apiRequest(API_CONFIG.ENDPOINTS.REGISTRATION.REGISTER, {
       method: 'POST',
       headers: {
@@ -26,6 +20,16 @@ export const registrationService = {
     return response.data?.registrations || [];
   },
 
+  // Get registrations with optional filters
+  getRegistrationsFiltered: async (filters: { hackathonId?: string; status?: string } = {}): Promise<Registration[]> => {
+    const params = new URLSearchParams();
+    if (filters.hackathonId) params.append('hackathonId', filters.hackathonId);
+    if (filters.status) params.append('status', filters.status);
+    const url = `${API_CONFIG.ENDPOINTS.REGISTRATION.LIST}?${params.toString()}`;
+    const response = await apiRequest(url, {}, true);
+    return response.data?.registrations || [];
+  },
+
   // Alias for getUserRegistrations (used in Profile page)
   getUserRegistrations: async (): Promise<Registration[]> => {
     const response = await apiRequest(API_CONFIG.ENDPOINTS.REGISTRATION.LIST, {}, true);
@@ -39,13 +43,13 @@ export const registrationService = {
   },
 
   // Update registration status (admin only)
-  updateRegistrationStatus: async (id: string, status: string): Promise<Registration> => {
+  updateRegistrationStatus: async (id: string, status: string, feedback?: string): Promise<Registration> => {
     const response = await apiRequest(API_CONFIG.ENDPOINTS.REGISTRATION.UPDATE_STATUS(id), {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, feedback }),
     }, true);
     return response.data;
   },

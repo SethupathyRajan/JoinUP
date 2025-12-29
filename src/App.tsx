@@ -7,6 +7,8 @@ import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { CompetitionsPage } from './components/competitions/CompetitionsPage';
+import AdminManageCompetition from './components/competitions/AdminManageCompetition';
+import RegisterCompetitionPage from './components/competitions/RegisterPage';
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage';
 import { HistoryPage } from './components/history/HistoryPage';
 import ProfilePage from './components/profile/ProfilePage';
@@ -66,6 +68,8 @@ function App() {
               <Route index element={<Navigate to="/dashboard" />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="competitions" element={<CompetitionsPage />} />
+              <Route path="competitions/register/:id" element={<RegisterCompetitionPage />} />
+              <Route path="competitions/manage/:id" element={<AdminManageCompetition />} />
               <Route path="leaderboard" element={<LeaderboardPage />} />
               <Route path="history" element={<HistoryPage />} />
               <Route path="profile" element={<ProfilePage />} />

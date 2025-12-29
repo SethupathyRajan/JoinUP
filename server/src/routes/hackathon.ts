@@ -6,12 +6,130 @@ import { Hackathon, ApiResponse } from '../models/types.js';
 
 const router = express.Router();
 
+// Local sample data used when the hackathons collection is empty (for dev/testing)
+const SAMPLE_HACKATHONS: any[] = [
+  {
+    id: 'sample-1',
+    title: 'Tech Hackathon 2026',
+    description: 'Build innovative solutions using cutting-edge technology',
+    startDate: new Date('2026-03-15'),
+    endDate: new Date('2026-03-17'),
+    registrationDeadline: new Date('2026-03-10'),
+    maxTeamSize: 4,
+    minTeamSize: 1,
+    status: 'upcoming',
+    tags: ['Web Development', 'AI/ML', 'Mobile'],
+    prizeMoney: 50000,
+    location: 'Tech Campus',
+    registeredTeams: 45,
+    totalSlots: 100,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'admin'
+  },
+  {
+    id: 'sample-2',
+    title: 'AI/ML Challenge',
+    description: 'Solve real-world problems using artificial intelligence and machine learning',
+    startDate: new Date('2026-04-05'),
+    endDate: new Date('2026-04-07'),
+    registrationDeadline: new Date('2026-03-30'),
+    maxTeamSize: 3,
+    minTeamSize: 1,
+    status: 'upcoming',
+    tags: ['AI/ML', 'Data Science', 'Python'],
+    prizeMoney: 75000,
+    location: 'Innovation Lab',
+    registeredTeams: 28,
+    totalSlots: 50,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'admin'
+  },
+  {
+    id: 'sample-3',
+    title: 'Web Development Contest',
+    description: 'Create stunning web applications with modern frameworks',
+    startDate: new Date('2026-05-10'),
+    endDate: new Date('2026-05-11'),
+    registrationDeadline: new Date('2026-05-01'),
+    maxTeamSize: 2,
+    minTeamSize: 1,
+    status: 'upcoming',
+    tags: ['React', 'Node.js', 'Full Stack'],
+    prizeMoney: 30000,
+    location: 'Online',
+    registeredTeams: 67,
+    totalSlots: 80,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'admin'
+  },
+  {
+    id: 'sample-4',
+    title: 'CyberSecure Sprint',
+    description: 'Capture the flag style security contest focused on applied cyber security techniques',
+    startDate: new Date('2026-02-20'),
+    endDate: new Date('2026-02-21'),
+    registrationDeadline: new Date('2026-02-15'),
+    maxTeamSize: 5,
+    minTeamSize: 1,
+    status: 'upcoming',
+    tags: ['Cyber Security', 'CTF', 'Networking'],
+    prizeMoney: 40000,
+    location: 'Security Lab',
+    registeredTeams: 12,
+    totalSlots: 50,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'admin'
+  },
+  {
+    id: 'sample-5',
+    title: 'Designathon',
+    description: 'A creative design challenge focusing on UI/UX and product thinking',
+    startDate: new Date('2026-01-10'),
+    endDate: new Date('2026-01-11'),
+    registrationDeadline: new Date('2026-01-05'),
+    maxTeamSize: 3,
+    minTeamSize: 1,
+    status: 'completed',
+    tags: ['Design', 'Product', 'UI/UX'],
+    prizeMoney: 20000,
+    location: 'Design Studio',
+    registeredTeams: 30,
+    totalSlots: 30,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'admin'
+  },
+  {
+    id: 'sample-6',
+    title: 'Mobile App Jam',
+    description: 'Rapid mobile app prototyping by multidisciplinary teams',
+    startDate: new Date('2026-06-12'),
+    endDate: new Date('2026-06-13'),
+    registrationDeadline: new Date('2026-06-01'),
+    maxTeamSize: 4,
+    minTeamSize: 1,
+    status: 'upcoming',
+    tags: ['Mobile', 'Android', 'iOS'],
+    prizeMoney: 35000,
+    location: 'Innovation Hub',
+    registeredTeams: 5,
+    totalSlots: 60,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'admin'
+  }
+];
+
 // Get all hackathons (public)
 router.get('/', async (req, res) => {
   try {
     const { status, category, limit = 20, page = 1 } = req.query as any;
     
-    let query = db.collection('hackathons');
+  let query: any = db.collection('hackathons');
     
     if (status) {
       query = query.where('status', '==', status);
@@ -29,21 +147,22 @@ router.get('/', async (req, res) => {
       .offset(offset)
       .get();
     
-    let hackathons = snapshot.docs.map(doc => ({
+    let hackathons: any[] = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
     
     // If no hackathons found, return sample data for testing
     if (hackathons.length === 0) {
+      // Expanded sample list for local testing
       hackathons = [
         {
           id: 'sample-1',
-          title: 'Tech Hackathon 2024',
+          title: 'Tech Hackathon 2026',
           description: 'Build innovative solutions using cutting-edge technology',
-          startDate: new Date('2025-01-15'),
-          endDate: new Date('2025-01-17'),
-          registrationDeadline: new Date('2025-01-10'),
+          startDate: new Date('2026-03-15'),
+          endDate: new Date('2026-03-17'),
+          registrationDeadline: new Date('2026-03-10'),
           maxTeamSize: 4,
           minTeamSize: 1,
           status: 'upcoming',
@@ -57,12 +176,12 @@ router.get('/', async (req, res) => {
           createdBy: 'admin'
         },
         {
-          id: 'sample-2', 
+          id: 'sample-2',
           title: 'AI/ML Challenge',
           description: 'Solve real-world problems using artificial intelligence and machine learning',
-          startDate: new Date('2025-01-22'),
-          endDate: new Date('2025-01-24'),
-          registrationDeadline: new Date('2025-01-18'),
+          startDate: new Date('2026-04-05'),
+          endDate: new Date('2026-04-07'),
+          registrationDeadline: new Date('2026-03-30'),
           maxTeamSize: 3,
           minTeamSize: 1,
           status: 'upcoming',
@@ -79,9 +198,9 @@ router.get('/', async (req, res) => {
           id: 'sample-3',
           title: 'Web Development Contest',
           description: 'Create stunning web applications with modern frameworks',
-          startDate: new Date('2025-02-05'),
-          endDate: new Date('2025-02-06'),
-          registrationDeadline: new Date('2025-02-01'),
+          startDate: new Date('2026-05-10'),
+          endDate: new Date('2026-05-11'),
+          registrationDeadline: new Date('2026-05-01'),
           maxTeamSize: 2,
           minTeamSize: 1,
           status: 'upcoming',
@@ -90,6 +209,63 @@ router.get('/', async (req, res) => {
           location: 'Online',
           registeredTeams: 67,
           totalSlots: 80,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'admin'
+        },
+        {
+          id: 'sample-4',
+          title: 'CyberSecure Sprint',
+          description: 'Capture the flag style security contest focused on applied cyber security techniques',
+          startDate: new Date('2026-02-20'),
+          endDate: new Date('2026-02-21'),
+          registrationDeadline: new Date('2026-02-15'),
+          maxTeamSize: 5,
+          minTeamSize: 1,
+          status: 'upcoming',
+          tags: ['Cyber Security', 'CTF', 'Networking'],
+          prizeMoney: 40000,
+          location: 'Security Lab',
+          registeredTeams: 12,
+          totalSlots: 50,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'admin'
+        },
+        {
+          id: 'sample-5',
+          title: 'Designathon',
+          description: 'A creative design challenge focusing on UI/UX and product thinking',
+          startDate: new Date('2026-01-10'),
+          endDate: new Date('2026-01-11'),
+          registrationDeadline: new Date('2026-01-05'),
+          maxTeamSize: 3,
+          minTeamSize: 1,
+          status: 'completed',
+          tags: ['Design', 'Product', 'UI/UX'],
+          prizeMoney: 20000,
+          location: 'Design Studio',
+          registeredTeams: 30,
+          totalSlots: 30,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'admin'
+        },
+        {
+          id: 'sample-6',
+          title: 'Mobile App Jam',
+          description: 'Rapid mobile app prototyping by multidisciplinary teams',
+          startDate: new Date('2026-06-12'),
+          endDate: new Date('2026-06-13'),
+          registrationDeadline: new Date('2026-06-01'),
+          maxTeamSize: 4,
+          minTeamSize: 1,
+          status: 'upcoming',
+          tags: ['Mobile', 'Android', 'iOS'],
+          prizeMoney: 35000,
+          location: 'Innovation Hub',
+          registeredTeams: 5,
+          totalSlots: 60,
           createdAt: new Date(),
           updatedAt: new Date(),
           createdBy: 'admin'
@@ -122,6 +298,20 @@ router.get('/:hackathonId', async (req, res) => {
     const hackathonDoc = await db.collection('hackathons').doc(hackathonId).get();
     
     if (!hackathonDoc.exists) {
+      // If collection is empty, try to return a sample hackathon matching the id
+      const collectionSnapshot = await db.collection('hackathons').limit(1).get();
+      if (collectionSnapshot.empty) {
+        const sample = SAMPLE_HACKATHONS.find(s => s.id === hackathonId);
+        if (sample) {
+          const response: ApiResponse<{ hackathon: any }> = {
+            success: true,
+            data: { hackathon: sample },
+            message: 'Hackathon (sample) retrieved successfully'
+          };
+          return res.json(response);
+        }
+      }
+
       return res.status(404).json({
         success: false,
         error: 'Hackathon not found'

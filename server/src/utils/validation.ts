@@ -150,18 +150,33 @@ export const updateHackathonSchema = Joi.object({
 export const createRegistrationSchema = Joi.object({
   hackathonId: Joi.string().required(),
   teamName: Joi.string().min(2).max(100).optional(),
-  teamMembers: Joi.array().items(Joi.object({
-    email: emailSchema.custom((value, helpers) => {
-      if (!isValidStudentEmail(value)) {
-        return helpers.error('email.student');
-      }
-      return value;
-    }),
-    name: Joi.string().min(2).max(100).required(),
-    rollNumber: rollNumberSchema,
-    department: departmentSchema,
-    year: yearSchema,
-  })).min(0).max(9).optional(),
+  teamMembers: Joi.array().items(
+    Joi.alternatives().try(
+      Joi.string().min(1), // userId
+      Joi.object({
+        email: emailSchema.custom((value, helpers) => {
+          if (!isValidStudentEmail(value)) {
+            return helpers.error('email.student');
+          }
+          return value;
+        }),
+        name: Joi.string().min(2).max(100).required(),
+        rollNumber: rollNumberSchema,
+        department: departmentSchema,
+        year: yearSchema,
+      })
+    )
+  ).min(0).max(9).optional(),
+  gformLink: Joi.string().uri().optional(),
+  note: Joi.string().max(2000).optional(),
+  bonafideFiles: Joi.array().items(Joi.object({
+    fileName: Joi.string().required(),
+    originalName: Joi.string().required(),
+    googleDriveFileId: Joi.string().required(),
+    uploadedAt: Joi.date().required(),
+    fileSize: Joi.number().required(),
+    mimeType: Joi.string().required()
+  })).optional()
 });
 
 export const updateRegistrationStatusSchema = Joi.object({
@@ -242,6 +257,13 @@ export const validate = (schema: Joi.ObjectSchema) => {
 
     if (error) {
       const errors = error.details.map((detail) => detail.message);
+      // Log detailed validation information for debugging
+      console.error('Validation failed for request', {
+        path: req.path,
+        method: req.method,
+        body: req.body,
+        details: error.details.map(d => ({ message: d.message, path: d.path, type: d.type }))
+      });
       return res.status(400).json({
         success: false,
         error: 'Validation failed',

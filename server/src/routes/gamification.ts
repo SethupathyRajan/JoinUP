@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import { ApiResponse } from '../models/types.js';
 import { getLeaderboard, BADGE_DEFINITIONS } from '../services/gamification.js';
+import { db } from '../server.js';
 
 const router = express.Router();
 
@@ -15,15 +16,24 @@ router.get('/stats', authenticateToken, async (req, res) => {
         error: 'Gamification stats are only available for students'
       });
     }
-    
-    // For now, return default stats since we haven't implemented the full gamification system
+
+    // Fetch user's gameStats from Firestore
+    const userId = req.user!.id;
+    const userDoc = await db.collection('users').doc(userId).get();
+
+    if (!userDoc.exists) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const userData: any = userDoc.data();
+
     const defaultStats = {
       points: 0,
       level: 1,
       badges: [],
       streaks: {
         daily: 0,
-        weekly: 0, 
+        weekly: 0,
         hackathon: 0,
         lastUpdated: new Date()
       },
@@ -31,13 +41,15 @@ router.get('/stats', authenticateToken, async (req, res) => {
       totalParticipations: 0,
       totalWins: 0
     };
-    
+
+    const stats = userData.gameStats || defaultStats;
+
     const response: ApiResponse<any> = {
       success: true,
-      data: defaultStats,
+      data: stats,
       message: 'Stats retrieved successfully'
     };
-    
+
     res.json(response);
     
   } catch (error) {
@@ -52,8 +64,8 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // Get user achievements
 router.get('/achievements', authenticateToken, async (req, res) => {
   try {
-    // For now, return empty achievements
-    const achievements = [];
+  // For now, return empty achievements
+  const achievements: any[] = [];
     
     const response: ApiResponse<{ achievements: any[] }> = {
       success: true,
@@ -77,7 +89,7 @@ router.get('/leaderboard', async (req, res) => {
   try {
     const { department, year, limit = 50 } = req.query as any;
     
-    let leaderboard = [];
+  let leaderboard: any[] = [];
     try {
       leaderboard = await getLeaderboard(
         parseInt(limit),

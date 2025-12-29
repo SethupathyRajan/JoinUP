@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import {
   TrophyIcon,
   CalendarIcon,
@@ -15,14 +16,17 @@ import { registrationService } from '../../services/registrationService';
 import { Hackathon, Registration } from '../../types';
 import toast from 'react-hot-toast';
 
+// RegisterModal removed - using full page registration route instead
+
 export const CompetitionsPage: React.FC = () => {
   const { currentUser, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
   const [competitions, setCompetitions] = useState<Hackathon[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState<string | null>(null);
+  const [registering] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,25 +50,9 @@ export const CompetitionsPage: React.FC = () => {
     fetchData();
   }, []);
 
-  const handleRegister = async (hackathonId: string) => {
-    try {
-      setRegistering(hackathonId);
-      await registrationService.registerForHackathon({
-        hackathonId,
-        teamMembers: [currentUser!.id] // Single member team by default
-      });
-      
-      // Refresh registrations
-      const updatedRegistrations = await registrationService.getRegistrations();
-      setRegistrations(updatedRegistrations);
-      
-      toast.success('Registration submitted successfully!');
-    } catch (error: any) {
-      toast.error(error.message || 'Registration failed');
-    } finally {
-      setRegistering(null);
-    }
-  };
+  // handleRegister removed; using modal-based registration
+
+  // Registration now handled via full page route
 
   const filteredCompetitions = competitions
     .filter(comp => comp.status === activeTab)
@@ -92,6 +80,11 @@ export const CompetitionsPage: React.FC = () => {
   };
 
   return (
+    loading ? (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    ) : (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -196,14 +189,14 @@ export const CompetitionsPage: React.FC = () => {
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Registrations</span>
-                  <span>{competition.registeredTeams || 0}/{competition.totalSlots || 0}</span>
+                  <span>{(competition as any).registeredTeams || 0}/{(competition as any).totalSlots || 0}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-full"
                     style={{ 
-                      width: `${competition.registeredTeams && competition.totalSlots 
-                        ? (competition.registeredTeams / competition.totalSlots) * 100 
+                      width: `${((competition as any).registeredTeams && (competition as any).totalSlots) 
+                        ? ((competition as any).registeredTeams / (competition as any).totalSlots) * 100 
                         : 0}%` 
                     }}
                   ></div>
@@ -218,7 +211,7 @@ export const CompetitionsPage: React.FC = () => {
                 
                 if (isAdmin) {
                   return (
-                    <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium">
+                    <button onClick={() => navigate(`/competitions/manage/${competition.id}`)} className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium">
                       Manage Competition
                     </button>
                   );
@@ -247,13 +240,15 @@ export const CompetitionsPage: React.FC = () => {
                 }
                 
                 return (
-                  <button 
-                    onClick={() => handleRegister(competition.id)}
-                    disabled={isLoading}
-                    className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading ? 'Registering...' : 'Register Now'}
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => navigate(`/competitions/register/${competition.id}`)}
+                      disabled={isLoading}
+                      className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isLoading ? 'Registering...' : 'Register Now'}
+                    </button>
+                  </>
                 );
               })()}
             </div>
@@ -270,5 +265,6 @@ export const CompetitionsPage: React.FC = () => {
         </div>
       )}
     </div>
+    )
   );
 };

@@ -19,6 +19,7 @@ export const API_CONFIG = {
     
     // User endpoints
     USER: {
+      SEARCH: `${API_BASE_URL}/user/search`,
       PROFILE: `${API_BASE_URL}/user/profile`,
       UPDATE_PROFILE: `${API_BASE_URL}/auth/update-profile`,
       UPLOAD_AVATAR: `${API_BASE_URL}/user/upload-avatar`,
@@ -36,7 +37,8 @@ export const API_CONFIG = {
     
     // Registration endpoints
     REGISTRATION: {
-      REGISTER: `${API_BASE_URL}/registration/register`,
+      // Server expects POST to /api/registration
+      REGISTER: `${API_BASE_URL}/registration`,
       LIST: `${API_BASE_URL}/registration`,
       DETAILS: (id: string) => `${API_BASE_URL}/registration/${id}`,
       UPDATE_STATUS: (id: string) => `${API_BASE_URL}/registration/${id}/status`,
@@ -77,6 +79,7 @@ export const API_CONFIG = {
 export const createAuthHeaders = (token?: string) => {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   };
   
   if (token) {
@@ -109,8 +112,20 @@ export const apiRequest = async (
   });
   
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    // Try to parse JSON error body, but fall back to status text
+    const errorText = await response.text().catch(() => '');
+    let errorData: any = null;
+    try {
+      errorData = JSON.parse(errorText || '{}');
+    } catch (e) {
+      errorData = null;
+    }
+
+    const serverMessage = errorData?.error || errorData?.message || errorText || response.statusText;
+    const msg = `HTTP ${response.status} ${response.statusText} - ${serverMessage} (${response.url})`;
+    // Log full response for easier debugging in dev
+    console.error('API request failed:', { url, status: response.status, statusText: response.statusText, body: errorData || errorText });
+    throw new Error(msg);
   }
   
   return response.json();

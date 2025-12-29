@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Settings, Trophy, Target, Calendar, Mail, Phone, GraduationCap, Hash, CreditCard as Edit3, Save, X, Lock, Shield, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { auth } from '../../config/firebase';
 import { useParams, useNavigate } from 'react-router-dom';
 import { gamificationService } from '../../services/gamificationService';
 import { registrationService } from '../../services/registrationService';
@@ -140,11 +141,14 @@ const ProfilePage: React.FC = () => {
 
     try {
       // Call API to verify password and update profile
+      // Get fresh Firebase ID token from client SDK
+      const idToken = await auth.currentUser?.getIdToken();
+
       const response = await fetch('/api/auth/update-profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await currentUser?.getIdToken()}`
+          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
         body: JSON.stringify({
           ...profileData,
@@ -180,11 +184,13 @@ const ProfilePage: React.FC = () => {
     }
 
     try {
+      const idToken = await auth.currentUser?.getIdToken();
+
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await currentUser?.getIdToken()}`
+          ...(idToken ? { 'Authorization': `Bearer ${idToken}` } : {})
         },
         body: JSON.stringify({
           currentPassword: passwordData.currentPassword,
