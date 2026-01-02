@@ -215,6 +215,9 @@ export const awardPoints = async (userId: string, points: number, reason: string
     }
     
     const userData = userDoc.data() as User;
+    if (!userData.gameStats) {
+      throw new Error('User game stats not initialized');
+    }
     const currentLevel = calculateLevel(userData.gameStats.points);
     const newPoints = userData.gameStats.points + points;
     const newLevel = calculateLevel(newPoints);
@@ -235,7 +238,7 @@ export const awardPoints = async (userId: string, points: number, reason: string
       points,
       reason,
       timestamp: new Date(),
-      previousTotal: userData.gameStats.points,
+      previousTotal: userData.gameStats?.points || 0,
       newTotal: newPoints,
       leveledUp,
       oldLevel: currentLevel.level,
@@ -257,10 +260,10 @@ export const awardPoints = async (userId: string, points: number, reason: string
         template: 'level-up',
         context: {
           userName: userData.name,
-          oldLevel: currentLevel.level,
-          newLevel: newLevel.level,
+          oldLevel: String(currentLevel.level),
+          newLevel: String(newLevel.level),
           levelName: newLevel.name,
-          totalPoints: newPoints
+          totalPoints: String(newPoints)
         }
       });
     }
@@ -285,10 +288,13 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
     }
     
     const userData = userDoc.data() as User;
+    if (!userData.gameStats) {
+      throw new Error('User game stats not initialized');
+    }
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    let updates: any = {
+    const updates: Record<string, unknown> = {
       'gameStats.streaks.lastUpdated': now,
       updatedAt: now
     };
@@ -342,6 +348,9 @@ export const checkAndAwardAchievements = async (userId: string): Promise<void> =
     }
     
     const userData = userDoc.data() as User;
+    if (!userData.gameStats) {
+      return;
+    }
     const currentBadgeIds = userData.gameStats.badges.map(badge => badge.id);
     const newBadges: Badge[] = [];
     
@@ -375,13 +384,13 @@ export const checkAndAwardAchievements = async (userId: string): Promise<void> =
     }
     
     // Check for Champion badge (10+ wins)
-    if (userData.gameStats.totalWins >= 10 && !currentBadgeIds.includes('champion')) {
+    if (userData.gameStats && userData.gameStats.totalWins >= 10 && !currentBadgeIds.includes('champion')) {
       const championBadge = BADGE_DEFINITIONS.find(b => b.id === 'champion');
       if (championBadge) newBadges.push(championBadge);
     }
     
     // Award new badges
-    if (newBadges.length > 0) {
+    if (newBadges.length > 0 && userData.gameStats) {
       const updatedBadges = [...userData.gameStats.badges, ...newBadges];
       
       await userRef.update({
@@ -446,16 +455,18 @@ export const processCompetitionResult = async (
     // Update total wins if user won
     if (achievements.some(a => a.type === 'winner')) {
       const userRef = db.collection('users').doc(userId);
+      const { FieldValue } = await import('firebase-admin/firestore');
       await userRef.update({
-        'gameStats.totalWins': db.FieldValue.increment(1),
-        'gameStats.totalParticipations': db.FieldValue.increment(1),
+        'gameStats.totalWins': FieldValue.increment(1),
+        'gameStats.totalParticipations': FieldValue.increment(1),
         updatedAt: new Date()
       });
     } else {
       // Just update participations
       const userRef = db.collection('users').doc(userId);
+      const { FieldValue } = await import('firebase-admin/firestore');
       await userRef.update({
-        'gameStats.totalParticipations': db.FieldValue.increment(1),
+        'gameStats.totalParticipations': FieldValue.increment(1),
         updatedAt: new Date()
       });
     }
@@ -491,6 +502,9 @@ export const getLeaderboard = async (
     
     const leaderboard: LeaderboardEntry[] = snapshot.docs.map((doc, index) => {
       const userData = doc.data() as User;
+      if (!userData.gameStats) {
+        throw new Error('User game stats not initialized');
+      }
       return {
         userId: userData.id,
         userName: userData.name,

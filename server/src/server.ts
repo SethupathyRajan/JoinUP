@@ -39,7 +39,7 @@ if (!getApps().length) {
   };
 
   initializeApp({
-    credential: cert(serviceAccount as any),
+    credential: cert(serviceAccount as Record<string, unknown>),
   });
 }
 
@@ -142,29 +142,31 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/webscraping', webScrapingRoutes);
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: unknown, req: express.Request, res: express.Response) => {
   console.error('Error:', err);
   
+  const error = err as { code?: string; name?: string; details?: Array<{ message: string }>; message?: string };
+  
   // Handle different types of errors
-  if (err.code === 'auth/user-not-found') {
+  if (error.code === 'auth/user-not-found') {
     return res.status(404).json({ error: 'User not found' });
   }
   
-  if (err.code === 'auth/wrong-password') {
+  if (error.code === 'auth/wrong-password') {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   
-  if (err.code === 'auth/email-already-in-use') {
+  if (error.code === 'auth/email-already-in-use') {
     return res.status(400).json({ error: 'Email already in use' });
   }
   
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({ error: err.details[0].message });
+  if (error.name === 'ValidationError' && error.details && error.details[0]) {
+    return res.status(400).json({ error: error.details[0].message });
   }
   
   res.status(500).json({ 
     error: 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { details: err.message })
+    ...(process.env.NODE_ENV === 'development' && { details: error.message })
   });
 });
 

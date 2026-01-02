@@ -2,7 +2,6 @@ import express from 'express';
 import { adminAuth, db } from '../server.js';
 import { 
   authenticateToken, 
-  isValidStudentEmail, 
   sensitiveOperationLimiter 
 } from '../middleware/auth.js';
 import { 
@@ -14,7 +13,7 @@ import {
   resetPasswordSchema 
 } from '../utils/validation.js';
 import { sendEmail } from '../services/email.js';
-import { generateResetToken, verifyResetToken } from '../utils/crypto.js';
+import { generateResetToken } from '../utils/crypto.js';
 import { User, GameStats, ApiResponse } from '../models/types.js';
 
 const router = express.Router();
@@ -122,10 +121,11 @@ router.post('/register', validate(registerSchema), async (req, res) => {
 
     res.status(201).json(response);
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Registration error:', error);
     
-    if (error.code === 'auth/email-already-exists') {
+    const firebaseError = error as { code?: string };
+    if (firebaseError.code === 'auth/email-already-exists') {
       return res.status(400).json({
         success: false,
         error: 'Email already registered'

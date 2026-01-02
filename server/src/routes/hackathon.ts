@@ -1,5 +1,6 @@
 import express from 'express';
 import { db } from '../server.js';
+import { Query, CollectionReference, DocumentData } from 'firebase-admin/firestore';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 import { validate, createHackathonSchema, updateHackathonSchema } from '../utils/validation.js';
 import { Hackathon, ApiResponse } from '../models/types.js';
@@ -127,27 +128,30 @@ const SAMPLE_HACKATHONS: any[] = [
 // Get all hackathons (public)
 router.get('/', async (req, res) => {
   try {
-    const { status, category, limit = 20, page = 1 } = req.query as any;
+    const { status, category, limit = 20, page = 1 } = req.query;
     
-  let query: any = db.collection('hackathons');
+    const limitNum = Number(limit) || 20;
+    const pageNum = Number(page) || 1;
+    
+    let dbQuery: Query<DocumentData> | CollectionReference<DocumentData> = db.collection('hackathons');
     
     if (status) {
-      query = query.where('status', '==', status);
+      dbQuery = dbQuery.where('status', '==', status);
     }
     
     if (category) {
-      query = query.where('category', '==', category);
+      dbQuery = dbQuery.where('category', '==', category);
     }
     
     // Apply pagination  
-    const offset = (page - 1) * limit;
-    const snapshot = await query
+    const offset = (pageNum - 1) * limitNum;
+    const snapshot = await dbQuery
       .orderBy('createdAt', 'desc')
-      .limit(limit)
+      .limit(limitNum)
       .offset(offset)
       .get();
     
-    let hackathons: any[] = snapshot.docs.map(doc => ({
+    let hackathons: Array<Record<string, unknown>> = snapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data()
     }));

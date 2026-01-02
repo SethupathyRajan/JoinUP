@@ -1,9 +1,16 @@
 import { Registration } from '../types';
 import { apiRequest, API_CONFIG } from '../config/api';
 
+interface RegistrationData {
+  hackathonId: string;
+  teamName?: string;
+  teamMembers?: Array<Record<string, string>>;
+  isTeamLeader: boolean;
+}
+
 export const registrationService = {
   // Register for hackathon
-  registerForHackathon: async (registrationData: any): Promise<Registration> => {
+  registerForHackathon: async (registrationData: RegistrationData): Promise<Registration> => {
     const response = await apiRequest(API_CONFIG.ENDPOINTS.REGISTRATION.REGISTER, {
       method: 'POST',
       headers: {

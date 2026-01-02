@@ -55,12 +55,12 @@ export const hackathonService = {
       const listRes = await apiRequest(API_CONFIG.ENDPOINTS.HACKATHON.LIST, {}, true);
       const hackathons = listRes.data?.hackathons || [];
         if (hackathons && hackathons.length > 0) {
-          const found = hackathons.find((h: any) => h.id === id);
+          const found = hackathons.find((h: Hackathon) => h.id === id);
           if (found) return found as Hackathon;
         } else {
           // if list returns empty, reuse getAllHackathons local fallback (call directly)
           const fallback = await hackathonService.getAllHackathons();
-          const found = (fallback || []).find((h: any) => h.id === id);
+          const found = (fallback || []).find((h: Hackathon) => h.id === id);
           if (found) return found as Hackathon;
         }
     } catch (e) {

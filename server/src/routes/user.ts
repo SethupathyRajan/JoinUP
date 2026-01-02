@@ -1,5 +1,6 @@
 import express from 'express';
 import { db } from '../server.js';
+import { Query, CollectionReference, DocumentData } from 'firebase-admin/firestore';
 import { authenticateToken, requireOwnershipOrAdmin } from '../middleware/auth.js';
 import { validate, updateProfileSchema, validateQuery, paginationSchema } from '../utils/validation.js';
 import { User, ApiResponse, PaginationOptions } from '../models/types.js';
@@ -252,22 +253,26 @@ router.get('/:userId/participations',
   async (req, res) => {
     try {
       const { userId } = req.params;
-      const { page, limit, sortBy, sortOrder } = req.query as PaginationOptions;
+      const queryParams = req.query;
+      const page = Number(queryParams.page) || 1;
+      const limit = Number(queryParams.limit) || 20;
+      const sortBy = queryParams.sortBy as string | undefined;
+      const sortOrder = (queryParams.sortOrder as 'asc' | 'desc') || 'desc';
       
       // Get user's registrations
-      let query = db.collection('registrations')
+      let dbQuery = db.collection('registrations')
         .where('userId', '==', userId);
       
       // Apply sorting
       if (sortBy) {
-        query = query.orderBy(sortBy, sortOrder as any);
+        dbQuery = dbQuery.orderBy(sortBy, sortOrder);
       } else {
-        query = query.orderBy('submittedAt', 'desc');
+        dbQuery = dbQuery.orderBy('submittedAt', 'desc');
       }
       
       // Apply pagination
       const offset = (page - 1) * limit;
-      const snapshot = await query.limit(limit).offset(offset).get();
+      const snapshot = await dbQuery.limit(limit).offset(offset).get();
       
       // Get total count
       const totalSnapshot = await db.collection('registrations')
@@ -278,7 +283,7 @@ router.get('/:userId/participations',
       
       // Fetch hackathon details for each registration
       for (const doc of snapshot.docs) {
-        const registration = { id: doc.id, ...doc.data() };
+        const registration = { id: doc.id, ...doc.data() } as { id: string; hackathonId: string };
         const hackathonDoc = await db.collection('hackathons').doc(registration.hackathonId).get();
         const hackathonData = hackathonDoc.exists ? hackathonDoc.data() : null;
         
@@ -324,22 +329,27 @@ router.get('/', authenticateToken, async (req, res) => {
       });
     }
     
-    const { search, department, year, page = 1, limit = 20 } = req.query as any;
+    const queryParams = req.query;
+    const search = queryParams.search as string | undefined;
+    const department = queryParams.department as string | undefined;
+    const year = queryParams.year as string | undefined;
+    const page = Number(queryParams.page) || 1;
+    const limit = Number(queryParams.limit) || 20;
     
-    let query = db.collection('users');
+    let dbQuery: Query<DocumentData> | CollectionReference<DocumentData> = db.collection('users');
     
     // Apply filters
     if (department) {
-      query = query.where('department', '==', department);
+      dbQuery = dbQuery.where('department', '==', department);
     }
     
     if (year) {
-      query = query.where('year', '==', parseInt(year));
+      dbQuery = dbQuery.where('year', '==', parseInt(year));
     }
     
     // For search, we'll get all matching docs and filter in memory
     // In production, consider using Algolia or similar for full-text search
-    const snapshot = await query.get();
+    const snapshot = await dbQuery.get();
     
     let users = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -371,12 +381,12 @@ router.get('/', authenticateToken, async (req, res) => {
       rollNumber: user.rollNumber,
       registerNumber: user.registerNumber,
       profilePicture: user.profilePicture,
-      gameStats: {
+      gameStats: user.gameStats ? {
         points: user.gameStats.points,
         level: user.gameStats.level,
         totalParticipations: user.gameStats.totalParticipations,
         totalWins: user.gameStats.totalWins
-      },
+      } : undefined,
       createdAt: user.createdAt
     }));
     

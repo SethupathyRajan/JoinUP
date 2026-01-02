@@ -2,13 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../server.js';
 import { User } from '../models/types.js';
 
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      user?: User;
-      isAdmin?: boolean;
-    }
+// Extend Express Request type with augmentation
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: User;
+    isAdmin?: boolean;
   }
 }
 
@@ -90,14 +88,16 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     }
     
     next();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Auth middleware error:', error);
     
-    if (error.code === 'auth/id-token-expired') {
+    const firebaseError = error as { code?: string };
+    
+    if (firebaseError.code === 'auth/id-token-expired') {
       return res.status(401).json({ error: 'Token expired' });
     }
     
-    if (error.code === 'auth/id-token-revoked') {
+    if (firebaseError.code === 'auth/id-token-revoked') {
       return res.status(401).json({ error: 'Token revoked' });
     }
     
@@ -144,8 +144,8 @@ export const sensitiveOperationLimiter = async (req: Request, res: Response, nex
   // For now, we'll use a simple in-memory approach
   
   const key = `${req.ip}-${req.path}`;
-  const limit = 5; // 5 attempts
-  const windowMs = 15 * 60 * 1000; // 15 minutes
+  // const limit = 5; // 5 attempts
+  // const windowMs = 15 * 60 * 1000; // 15 minutes
   
   // In production, use Redis for distributed rate limiting
   // For demo purposes, we'll just log the rate limiting attempt

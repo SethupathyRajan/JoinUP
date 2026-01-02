@@ -9,10 +9,12 @@ export interface User {
   registerNumber: string;
   phoneNumber?: string;
   profilePicture?: string;
-  gameStats: GameStats;
+  isAdmin?: boolean;
+  gameStats?: GameStats;
   createdAt: Date;
   updatedAt: Date;
   lastLogin?: Date;
+  lastDailyLogin?: Date;
 }
 
 export interface LoginRequest {
@@ -73,6 +75,7 @@ export interface UserStreak {
   weekly: number;
   hackathon: number;
   lastUpdated: Date;
+  lastDailyLogin?: Date;
 }
 
 export interface Achievement {
@@ -193,7 +196,7 @@ export interface Notification {
   isRead: boolean;
   createdAt: Date;
   actionUrl?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PushNotificationPayload {
@@ -201,7 +204,7 @@ export interface PushNotificationPayload {
   body: string;
   icon?: string;
   badge?: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 // Analytics Types
@@ -242,7 +245,7 @@ export interface PaginationOptions {
 }
 
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   message?: string;
@@ -321,5 +324,5 @@ export interface EmailContext {
   feedback?: string;
   resetLink?: string;
   loginUrl?: string;
-  [key: string]: any;
+  [key: string]: string | undefined;
 }
