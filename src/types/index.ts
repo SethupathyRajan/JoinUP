@@ -42,6 +42,11 @@ export interface Hackathon {
   prizeMoney?: number;
   location?: string;
   requirements?: string[];
+  category?: string;
+  difficulty?: 'beginner' | 'intermediate' | 'advanced';
+  gformLink?: string;
+  totalSlots?: number;
+  registeredTeams?: number;
 }
 
 export interface Registration {
@@ -58,17 +63,33 @@ export interface Registration {
   priority: 'low' | 'medium' | 'high';
 }
 
+export interface CertificateInfo {
+  fileName: string;
+  originalName: string;
+  googleDriveFileId: string;
+  uploadedAt: Date;
+  fileSize: number;
+  mimeType: string;
+}
+
+export interface CompetitionAchievement {
+  type: 'winner' | 'runner_up' | 'third_place' | 'top_10' | 'participation' | 'special_recognition';
+  title: string;
+  description?: string;
+  points: number;
+}
+
 export interface PostEventSubmission {
   id: string;
   registrationId: string;
   userId: string;
   hackathonId: string;
-  certificates: string[];
+  certificates: CertificateInfo[];
   projectLinks: string[];
   repoUrl?: string;
   demoUrl?: string;
   description: string;
-  achievements: string[];
+  achievements: CompetitionAchievement[];
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: Date;
   reviewedAt?: Date;

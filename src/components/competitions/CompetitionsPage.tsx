@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import { hackathonService } from '../../services/hackathonService';
 import { registrationService } from '../../services/registrationService';
 import { Hackathon, Registration } from '../../types';
+import { CreateCompetitionModal } from './CreateCompetitionModal';
 import toast from 'react-hot-toast';
 
 // RegisterModal removed - using full page registration route instead
@@ -27,6 +28,7 @@ export const CompetitionsPage: React.FC = () => {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState(true);
   const [registering] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -93,7 +95,10 @@ export const CompetitionsPage: React.FC = () => {
           <p className="text-gray-600 mt-1">Discover and join exciting competitions</p>
         </div>
         {currentUser?.isAdmin && (
-          <button className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all">
+          <button 
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
+          >
             <PlusIcon className="h-5 w-5" />
             <span>Create Competition</span>
           </button>
@@ -264,6 +269,23 @@ export const CompetitionsPage: React.FC = () => {
           <p className="text-gray-600">Try adjusting your search criteria or check back later.</p>
         </div>
       )}
+
+      {/* Create Competition Modal */}
+      <CreateCompetitionModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          // Refresh competitions list
+          hackathonService.getAllHackathons()
+            .then(data => {
+              setCompetitions(data);
+              toast.success('Competition list refreshed');
+            })
+            .catch(err => {
+              console.error('Error refreshing competitions:', err);
+            });
+        }}
+      />
     </div>
     )
   );

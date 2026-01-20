@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -13,6 +13,8 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NotificationDropdown } from '../notifications/NotificationDropdown';
+import { notificationService } from '../../services/notificationService';
 import brandLogo from '../../assets/brandlogo.png';
 
 export const Layout: React.FC = () => {
@@ -20,12 +22,15 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Competitions', href: '/competitions', icon: TrophyIcon },
     { name: 'Leaderboard', href: '/leaderboard', icon: UserGroupIcon },
     { name: 'History', href: '/history', icon: DocumentTextIcon },
+    { name: 'Notifications', href: '/notifications', icon: BellIcon, badge: unreadCount > 0 ? unreadCount : undefined },
     { name: 'Profile', href: '/profile', icon: UserIcon },
     ...(currentUser?.isAdmin ? [
       { name: 'Analytics', href: '/analytics', icon: ChartBarIcon }
@@ -36,6 +41,25 @@ export const Layout: React.FC = () => {
     await logout();
     navigate('/login');
   };
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const notifications = await notificationService.getNotifications(true);
+        setUnreadCount(notifications.length);
+      } catch (error) {
+        console.error('Error fetching unread count:', error);
+      }
+    };
+
+    if (currentUser) {
+      fetchUnreadCount();
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentUser]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,14 +102,21 @@ export const Layout: React.FC = () => {
                   <Link
                     to={item.href}
                     onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                    className={`flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                       isActive
                         ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
                         : 'text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <item.icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-700' : 'text-gray-400'}`} />
-                    {item.name}
+                    <div className="flex items-center">
+                      <item.icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-700' : 'text-gray-400'}`} />
+                      {item.name}
+                    </div>
+                    {(item as any).badge && (item as any).badge > 0 && (
+                      <span className="px-2 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full">
+                        {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );
@@ -125,11 +156,22 @@ export const Layout: React.FC = () => {
               
             </button>
 
-            <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-500 relative">
+            <div className="flex items-center space-x-4 relative">
+              <button
+                onClick={() => setNotificationDropdownOpen(!notificationDropdownOpen)}
+                className="p-2 text-gray-400 hover:text-gray-500 relative transition-colors"
+              >
                 <BellIcon className="h-6 w-6" />
-                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-400 ring-2 ring-white"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 block h-5 w-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center ring-2 ring-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </button>
+              <NotificationDropdown
+                isOpen={notificationDropdownOpen}
+                onClose={() => setNotificationDropdownOpen(false)}
+              />
             </div>
               <img src={brandLogo} alt="JoinUP Brand Logo" className="h-10 w-auto object-contain" />
           </div>

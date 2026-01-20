@@ -149,7 +149,7 @@ export const updateHackathonSchema = Joi.object({
 // Registration validation schemas
 export const createRegistrationSchema = Joi.object({
   hackathonId: Joi.string().required(),
-  teamName: Joi.string().min(2).max(100).optional(),
+  teamName: Joi.string().allow('', null).max(100).optional(),
   teamMembers: Joi.array().items(
     Joi.alternatives().try(
       Joi.string().min(1), // userId

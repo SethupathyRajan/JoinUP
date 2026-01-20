@@ -64,8 +64,20 @@ router.get('/stats', authenticateToken, async (req, res) => {
 // Get user achievements
 router.get('/achievements', authenticateToken, async (req, res) => {
   try {
-  // For now, return empty achievements
-  const achievements: any[] = [];
+    const userId = req.user!.id;
+    
+    // Get user's achievements from gameStats
+    const userDoc = await db.collection('users').doc(userId).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
+    }
+    
+    const userData = userDoc.data();
+    const achievements = userData?.gameStats?.achievements || [];
     
     const response: ApiResponse<{ achievements: any[] }> = {
       success: true,

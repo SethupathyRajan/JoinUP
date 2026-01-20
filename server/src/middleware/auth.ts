@@ -38,19 +38,22 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
+      console.log('❌ Token missing in request');
       return res.status(401).json({ error: 'Access token required' });
     }
 
+    console.log('🔍 Verifying token:', token.substring(0, 20) + '...');
+
     // Verify Firebase token
     const decodedToken = await adminAuth.verifyIdToken(token);
-    
+
     // Get user data from Firestore
     const { db } = await import('../server.js');
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    
+
     // Check if this is an admin user
     const isAdmin = isAdminEmail(decodedToken.email!);
-    
+
     if (!userDoc.exists) {
       // If user doesn't exist in Firestore, check if they're an admin
       if (isAdmin) {
@@ -66,10 +69,24 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
           phoneNumber: '',
           profilePicture: '',
           isAdmin: true,
+          gameStats: {
+            points: 0,
+            level: 1,
+            badges: [],
+            streaks: {
+              daily: 0,
+              weekly: 0,
+              hackathon: 0,
+              lastUpdated: new Date()
+            },
+            achievements: [],
+            totalParticipations: 0,
+            totalWins: 0
+          },
           createdAt: new Date(),
           updatedAt: new Date()
         };
-        
+
         req.user = adminUser;
         req.isAdmin = true;
       } else {
@@ -77,7 +94,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
       }
     } else {
       const userData = userDoc.data() as User;
-      
+
       // Check if email matches token email
       if (userData.email !== decodedToken.email) {
         return res.status(403).json({ error: 'Token email mismatch' });
@@ -86,7 +103,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
       req.user = userData;
       req.isAdmin = isAdmin;
     }
-    
+
     next();
   } catch (error: unknown) {
     console.error('Auth middleware error:', error);
@@ -100,7 +117,7 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     if (firebaseError.code === 'auth/id-token-revoked') {
       return res.status(401).json({ error: 'Token revoked' });
     }
-    
+
     return res.status(403).json({ error: 'Invalid token' });
   }
 };
@@ -125,15 +142,15 @@ export const requireStudent = (req: Request, res: Response, next: NextFunction) 
 export const requireOwnershipOrAdmin = (userIdParam: string = 'userId') => {
   return (req: Request, res: Response, next: NextFunction) => {
     const resourceUserId = req.params[userIdParam];
-    
+
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
-    
+
     if (req.user.id !== resourceUserId && !req.isAdmin) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
     next();
   };
 };
@@ -142,7 +159,7 @@ export const requireOwnershipOrAdmin = (userIdParam: string = 'userId') => {
 export const sensitiveOperationLimiter = async (req: Request, res: Response, next: NextFunction) => {
   // This would integrate with a Redis-based rate limiter in production
   // For now, we'll use a simple in-memory approach
-  
+
   const key = `${req.ip}-${req.path}`;
   // const limit = 5; // 5 attempts
   // const windowMs = 15 * 60 * 1000; // 15 minutes
@@ -150,6 +167,6 @@ export const sensitiveOperationLimiter = async (req: Request, res: Response, nex
   // In production, use Redis for distributed rate limiting
   // For demo purposes, we'll just log the rate limiting attempt
   console.log(`Rate limiting check for ${key}`);
-  
+
   next();
 };

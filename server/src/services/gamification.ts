@@ -300,32 +300,131 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
     };
     
     if (activityType === 'login') {
-      const lastLogin = userData.gameStats.streaks.lastDailyLogin;
-      const lastLoginDate = lastLogin ? new Date(lastLogin.getFullYear(), lastLogin.getMonth(), lastLogin.getDate()) : null;
+      const lastUpdated = userData.gameStats.streaks.lastUpdated;
+      const lastUpdatedDate = lastUpdated ? new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate()) : null;
       
       // Check if this is a new day
-      if (!lastLoginDate || lastLoginDate.getTime() !== today.getTime()) {
+      if (!lastUpdatedDate || lastUpdatedDate.getTime() !== today.getTime()) {
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
         
         let newDailyStreak = 1;
         
         // If logged in yesterday, increment streak
-        if (lastLoginDate && lastLoginDate.getTime() === yesterday.getTime()) {
-          newDailyStreak = userData.gameStats.streaks.daily + 1;
+        if (lastUpdatedDate && lastUpdatedDate.getTime() === yesterday.getTime()) {
+          newDailyStreak = (userData.gameStats.streaks.daily || 0) + 1;
+        } else if (lastUpdatedDate && lastUpdatedDate.getTime() !== today.getTime()) {
+          // Streak broken, reset to 1
+          newDailyStreak = 1;
         }
         
         updates['gameStats.streaks.daily'] = newDailyStreak;
-        updates['gameStats.streaks.lastDailyLogin'] = now;
         
         // Award bonus points for streak milestones
         if (newDailyStreak === 7) {
           await awardPoints(userId, POINTS.WEEKLY_LOGIN_BONUS_7_DAYS, '7-day login streak bonus');
+          await createNotification(userId, {
+            title: '🔥 7-Day Streak!',
+            message: `You've maintained a 7-day login streak! Keep it up!`,
+            type: 'achievement'
+          });
         } else if (newDailyStreak === 30) {
           await awardPoints(userId, POINTS.WEEKLY_LOGIN_BONUS_30_DAYS, '30-day login streak bonus');
+          await createNotification(userId, {
+            title: '⚡ 30-Day Streak!',
+            message: `Amazing! You've logged in for 30 consecutive days!`,
+            type: 'achievement'
+          });
         } else if (newDailyStreak === 100) {
           await awardPoints(userId, POINTS.WEEKLY_LOGIN_BONUS_100_DAYS, '100-day login streak bonus');
+          await createNotification(userId, {
+            title: '💯 100-Day Streak!',
+            message: `Incredible dedication! You've achieved a 100-day login streak!`,
+            type: 'achievement'
+          });
         }
+      }
+    } else if (activityType === 'weekly') {
+      // Weekly streak: consecutive weeks with at least one activity
+      const lastUpdated = userData.gameStats.streaks.lastUpdated;
+      
+      if (lastUpdated) {
+        const lastWeekStart = getWeekStart(lastUpdated);
+        const currentWeekStart = getWeekStart(now);
+        const previousWeekStart = new Date(currentWeekStart);
+        previousWeekStart.setDate(previousWeekStart.getDate() - 7);
+        
+        let newWeeklyStreak = 1;
+        
+        // If last activity was in the previous week, increment streak
+        if (lastWeekStart.getTime() === previousWeekStart.getTime()) {
+          newWeeklyStreak = (userData.gameStats.streaks.weekly || 0) + 1;
+        } else if (lastWeekStart.getTime() !== currentWeekStart.getTime()) {
+          // Streak broken, reset to 1
+          newWeeklyStreak = 1;
+        } else {
+          // Same week, maintain current streak
+          newWeeklyStreak = userData.gameStats.streaks.weekly || 1;
+        }
+        
+        updates['gameStats.streaks.weekly'] = newWeeklyStreak;
+        
+        // Award bonus points for weekly streak milestones
+        if (newWeeklyStreak === 4) {
+          await awardPoints(userId, 100, '4-week streak bonus');
+          await createNotification(userId, {
+            title: '📅 4-Week Streak!',
+            message: `You've been active for 4 consecutive weeks!`,
+            type: 'achievement'
+          });
+        } else if (newWeeklyStreak === 12) {
+          await awardPoints(userId, 300, '12-week streak bonus');
+          await createNotification(userId, {
+            title: '🎯 12-Week Streak!',
+            message: `3 months of consistent activity! Outstanding!`,
+            type: 'achievement'
+          });
+        } else if (newWeeklyStreak === 24) {
+          await awardPoints(userId, 600, '24-week streak bonus');
+          await createNotification(userId, {
+            title: '🏆 24-Week Streak!',
+            message: `Half a year of dedication! You're a legend!`,
+            type: 'achievement'
+          });
+        }
+      } else {
+        updates['gameStats.streaks.weekly'] = 1;
+      }
+    } else if (activityType === 'hackathon') {
+      // Hackathon streak: consecutive hackathons participated in
+      // This should be called when a registration is approved
+      const currentStreak = userData.gameStats.streaks.hackathon || 0;
+      const newHackathonStreak = currentStreak + 1;
+      
+      updates['gameStats.streaks.hackathon'] = newHackathonStreak;
+      
+      // Award bonus points for hackathon streak milestones
+      if (newHackathonStreak === 3) {
+        await awardPoints(userId, 150, '3-hackathon streak bonus');
+        await createNotification(userId, {
+          title: '🎪 3-Competition Streak!',
+          message: `You've participated in 3 consecutive competitions!`,
+          type: 'achievement'
+        });
+      } else if (newHackathonStreak === 5) {
+        await awardPoints(userId, 300, '5-hackathon streak bonus');
+        await createNotification(userId, {
+          title: '🌟 5-Competition Streak!',
+          message: `5 competitions in a row! You're on fire!`,
+          type: 'achievement'
+        });
+      } else if (newHackathonStreak === 10) {
+        await awardPoints(userId, 750, '10-hackathon streak bonus');
+        await createNotification(userId, {
+          title: '👑 10-Competition Streak!',
+          message: `10 consecutive competitions! You're unstoppable!`,
+          type: 'achievement'
+        });
       }
     }
     
@@ -337,7 +436,15 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
   }
 };
 
-// Check and award achievements/badges
+// Helper function to get the start of the week (Monday)
+const getWeekStart = (date: Date): Date => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+  return new Date(d.setDate(diff));
+};
+
+// Check and award achievements/badges (legacy - now uses achievementChecker)
 export const checkAndAwardAchievements = async (userId: string): Promise<void> => {
   try {
     const userRef = db.collection('users').doc(userId);
@@ -527,20 +634,5 @@ export const getLeaderboard = async (
   }
 };
 
-// Helper function to create notifications
-const createNotification = async (userId: string, notification: {
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'achievement';
-  actionUrl?: string;
-}) => {
-  await db.collection('notifications').add({
-    userId,
-    title: notification.title,
-    message: notification.message,
-    type: notification.type,
-    isRead: false,
-    createdAt: new Date(),
-    actionUrl: notification.actionUrl
-  });
-};
+// Helper function to create notifications (moved to notificationHelper)
+import { createNotification } from '../utils/notificationHelper.js';

@@ -69,7 +69,7 @@ export const API_CONFIG = {
     // Notification endpoints
     NOTIFICATION: {
       LIST: `${API_BASE_URL}/notification`,
-      MARK_READ: (id: string) => `${API_BASE_URL}/notification/${id}/read`,
+      MARK_READ: (id: string) => `${API_BASE_URL}/notification/mark-read`,
       SEND: `${API_BASE_URL}/notification/send`,
     },
   }

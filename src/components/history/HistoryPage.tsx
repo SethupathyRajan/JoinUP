@@ -13,23 +13,68 @@ import {
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { registrationService } from '../../services/registrationService';
-import { Registration } from '../../types';
+import { hackathonService } from '../../services/hackathonService';
+import { Registration, Hackathon } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { generateParticipationReport } from '../../utils/pdfGenerator';
 import toast from 'react-hot-toast';
 
+interface HistoryItem extends Registration {
+  hackathonTitle?: string;
+}
+
 export const HistoryPage: React.FC = () => {
+  const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDateRange, setFilterDateRange] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [participationHistory, setParticipationHistory] = useState<Registration[]>([]);
+  const [participationHistory, setParticipationHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingPDF, setExportingPDF] = useState(false);
+
+  // Helper function to convert Firestore timestamp to Date
+  const toDate = (value: any): Date => {
+    if (!value) return new Date();
+    if (value instanceof Date) return value;
+    if (value.toDate && typeof value.toDate === 'function') {
+      return value.toDate();
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      return new Date(value);
+    }
+    return new Date();
+  };
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         setLoading(true);
         const data = await registrationService.getRegistrations();
-        setParticipationHistory(data);
+        
+        // Convert Firestore timestamps and fetch hackathon details
+        const enrichedData = await Promise.all(
+          data.map(async (item: any) => {
+            const historyItem: HistoryItem = {
+              ...item,
+              submittedAt: toDate(item.submittedAt),
+              reviewedAt: item.reviewedAt ? toDate(item.reviewedAt) : undefined,
+            };
+
+            // Fetch hackathon title
+            try {
+              const hackathon = await hackathonService.getHackathon(item.hackathonId);
+              historyItem.hackathonTitle = hackathon.title;
+            } catch (err) {
+              console.warn(`Failed to fetch hackathon ${item.hackathonId}:`, err);
+              historyItem.hackathonTitle = item.hackathonId;
+            }
+
+            return historyItem;
+          })
+        );
+
+        setParticipationHistory(enrichedData);
       } catch (error) {
         console.error('Error fetching participation history:', error);
         toast.error('Failed to load participation history');
@@ -59,12 +104,35 @@ export const HistoryPage: React.FC = () => {
   };
 
   const filteredHistory = participationHistory.filter(item => {
-    const matchesSearch = item.hackathonId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.teamName?.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = 
+      (item.hackathonTitle?.toLowerCase().includes(searchLower)) ||
+      (item.hackathonId.toLowerCase().includes(searchLower)) ||
+      (item.teamName?.toLowerCase().includes(searchLower));
     
     const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
     
-    return matchesSearch && matchesStatus;
+    let matchesDate = true;
+    if (filterDateRange !== 'all') {
+      const now = new Date();
+      const itemDate = item.submittedAt;
+      
+      switch (filterDateRange) {
+        case 'this_year':
+          matchesDate = itemDate.getFullYear() === now.getFullYear();
+          break;
+        case 'last_6_months':
+          const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+          matchesDate = itemDate >= sixMonthsAgo;
+          break;
+        case 'last_3_months':
+          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+          matchesDate = itemDate >= threeMonthsAgo;
+          break;
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   const getStatusIcon = (status: string) => {
@@ -98,9 +166,55 @@ export const HistoryPage: React.FC = () => {
     }
   };
 
-  const handleExportPDF = () => {
-    // TODO: Implement PDF export functionality
-    console.log('Exporting PDF...');
+  const handleExportPDF = async () => {
+    if (!currentUser) {
+      toast.error('Please login to export your participation report');
+      return;
+    }
+
+    if (participationHistory.length === 0) {
+      toast.error('No participation history to export');
+      return;
+    }
+
+    try {
+      setExportingPDF(true);
+      toast.loading('Generating PDF report...', { id: 'pdf-export' });
+
+      // Calculate statistics
+      const stats = {
+        totalParticipations: participationHistory.length,
+        approved: participationHistory.filter(r => r.status === 'approved').length,
+        pending: participationHistory.filter(r => r.status === 'pending').length,
+        rejected: participationHistory.filter(r => r.status === 'rejected').length,
+        successRate: participationHistory.length > 0
+          ? Math.round((participationHistory.filter(r => r.status === 'approved').length / participationHistory.length) * 100)
+          : 0
+      };
+
+      // Prepare user data
+      const userData = {
+        name: currentUser.name,
+        email: currentUser.email,
+        department: currentUser.department,
+        year: currentUser.year,
+        rollNumber: currentUser.rollNumber
+      };
+
+      // Generate PDF
+      await generateParticipationReport({
+        user: userData,
+        registrations: participationHistory,
+        stats
+      });
+
+      toast.success('PDF report generated successfully!', { id: 'pdf-export' });
+    } catch (error: any) {
+      console.error('Error generating PDF:', error);
+      toast.error(error.message || 'Failed to generate PDF report', { id: 'pdf-export' });
+    } finally {
+      setExportingPDF(false);
+    }
   };
 
   return (
@@ -113,10 +227,11 @@ export const HistoryPage: React.FC = () => {
         </div>
         <button
           onClick={handleExportPDF}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all"
+          disabled={exportingPDF || participationHistory.length === 0}
+          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ArrowDownTrayIcon className="h-5 w-5" />
-          <span>Export PDF</span>
+          <span>{exportingPDF ? 'Generating...' : 'Export PDF'}</span>
         </button>
       </div>
 
@@ -274,7 +389,7 @@ export const HistoryPage: React.FC = () => {
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">{item.hackathonId}</h3>
+                      <h3 className="text-xl font-bold text-gray-900">{item.hackathonTitle || item.hackathonId}</h3>
                       {item.teamName && <p className="text-gray-600">Team: {item.teamName}</p>}
                     </div>
                     <div className="flex items-center space-x-2">
@@ -303,11 +418,17 @@ export const HistoryPage: React.FC = () => {
                     <div className="mb-3">
                       <p className="text-sm text-gray-600 mb-1">Team Members:</p>
                       <div className="flex flex-wrap gap-2">
-                        {item.teamMembers.map((memberId, idx) => (
-                          <span key={idx} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
-                            Member {idx + 1}
-                          </span>
-                        ))}
+                        {item.teamMembers.map((member: any, idx: number) => {
+                          const memberName = typeof member === 'string' 
+                            ? `Member ${idx + 1}` 
+                            : (member.name || member.email || `Member ${idx + 1}`);
+                          const memberRoll = typeof member === 'object' ? (member.rollNumber || member.registerNumber) : null;
+                          return (
+                            <span key={idx} className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded-full">
+                              {memberName}{memberRoll ? ` (${memberRoll})` : ''}
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

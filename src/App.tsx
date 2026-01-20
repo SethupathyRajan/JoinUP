@@ -12,10 +12,12 @@ import RegisterCompetitionPage from './components/competitions/RegisterPage';
 import { LeaderboardPage } from './components/leaderboard/LeaderboardPage';
 import { HistoryPage } from './components/history/HistoryPage';
 import ProfilePage from './components/profile/ProfilePage';
+import { NotificationList } from './components/notifications/NotificationList';
+import { SubmissionsPage } from './components/submissions/SubmissionsPage';
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -23,13 +25,13 @@ const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       </div>
     );
   }
-  
+
   return currentUser ? <>{children}</> : <Navigate to="/login" />;
 };
 
 const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { currentUser, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -37,7 +39,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       </div>
     );
   }
-  
+
   return currentUser ? <Navigate to="/dashboard" /> : <>{children}</>;
 };
 
@@ -72,14 +74,16 @@ function App() {
               <Route path="competitions/manage/:id" element={<AdminManageCompetition />} />
               <Route path="leaderboard" element={<LeaderboardPage />} />
               <Route path="history" element={<HistoryPage />} />
+              <Route path="submissions" element={<SubmissionsPage />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="profile/:userId" element={<ProfilePage />} />
+              <Route path="notifications" element={<NotificationList />} />
             </Route>
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
-          
+
           <Toaster
             position="top-right"
             toastOptions={{

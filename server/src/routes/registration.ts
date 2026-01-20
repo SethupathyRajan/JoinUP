@@ -11,9 +11,9 @@ const router = express.Router();
 // Register for hackathon (students only)
 router.post('/', authenticateToken, requireStudent, validate(createRegistrationSchema), async (req, res) => {
   try {
-  const { hackathonId, teamName, teamMembers, gformLink, note, bonafideFiles } = req.body;
-  const userId = req.user!.id;
-    
+    const { hackathonId, teamName, teamMembers, gformLink, note, bonafideFiles } = req.body;
+    const userId = req.user!.id;
+
     // Check if hackathon exists and is open for registration
     const hackathonDoc = await db.collection('hackathons').doc(hackathonId).get();
     let hackathonData: any = null;
@@ -162,11 +162,11 @@ router.post('/', authenticateToken, requireStudent, validate(createRegistrationS
         error: 'Registration deadline has passed'
       });
     }
-    
+
     // Check if user already registered (as leader or member)
     const existingRegistration = await db.collection('registrations')
       .where('hackathonId', '==', hackathonId)
-      .where('status', 'in', ['pending','approved'])
+      .where('status', 'in', ['pending', 'approved'])
       .get();
 
     const already = existingRegistration.docs.some(doc => {
@@ -221,7 +221,7 @@ router.post('/', authenticateToken, requireStudent, validate(createRegistrationS
     const registrationData: Omit<Registration, 'id'> = {
       hackathonId,
       userId,
-      teamName,
+      teamName: teamName || '',
       teamMembers: resolvedMembers,
       status: 'pending',
       submittedAt: new Date(),
@@ -237,22 +237,37 @@ router.post('/', authenticateToken, requireStudent, validate(createRegistrationS
     // Award points for registration to all members
     const hasTeam = resolvedMembers && resolvedMembers.length > 1;
     const points = hasTeam ? POINTS.COMPLETE_TEAM_REGISTRATION : POINTS.REGISTER_COMPETITION;
+
+    // Check if this is early registration (within 24 hours of announcement)
+    const hackathonCreatedAt = hackathonData.createdAt?.toDate ? hackathonData.createdAt.toDate() : new Date(hackathonData.createdAt || Date.now());
+    const isEarlyRegistration = (new Date().getTime() - hackathonCreatedAt.getTime()) < 24 * 60 * 60 * 1000;
+
     for (const member of resolvedMembers) {
       try {
         await awardPoints(member.id, points, `Registered for ${hackathonData.title}`);
+
+        // Check achievements for each member
+        const { checkAndAwardAchievements } = await import('../utils/achievementChecker.js');
+        await checkAndAwardAchievements(member.id, {
+          registrationId: docRef.id,
+          hackathonId: hackathonData.id,
+          isEarlyRegistration,
+          isTeamRegistration: hasTeam,
+          category: hackathonData.category
+        });
       } catch (err) {
-        console.error('Error awarding points to member', member.id, err);
+        console.error('Error awarding points/achievements to member', member.id, err);
       }
     }
-    
+
     const response: ApiResponse<{ registrationId: string }> = {
       success: true,
       data: { registrationId: docRef.id },
       message: 'Registration submitted successfully'
     };
-    
+
     res.status(201).json(response);
-    
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({
@@ -266,42 +281,42 @@ router.post('/', authenticateToken, requireStudent, validate(createRegistrationS
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { hackathonId, status, page = 1, limit = 20 } = req.query as any;
-    
-  let query: any = db.collection('registrations');
-    
+
+    let query: any = db.collection('registrations');
+
     // Students can only see their own registrations
     if (!req.isAdmin) {
       query = query.where('userId', '==', req.user!.id);
     }
-    
+
     if (hackathonId) {
       query = query.where('hackathonId', '==', hackathonId);
     }
-    
+
     if (status) {
       query = query.where('status', '==', status);
     }
-    
+
     // For now, remove orderBy to avoid index requirement
     // TODO: Create Firestore index for better performance
     const snapshot = await query
       .limit(limit)
       .offset((page - 1) * limit)
       .get();
-    
+
     const registrations = snapshot.docs.map((doc: any) => ({
       id: doc.id,
       ...doc.data()
     }));
-    
+
     const response: ApiResponse<{ registrations: any[] }> = {
       success: true,
       data: { registrations },
       message: 'Registrations retrieved successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Get registrations error:', error);
     res.status(500).json({
@@ -312,25 +327,25 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Update registration status (admin only)
-router.put('/:registrationId/status', 
-  authenticateToken, 
-  requireAdmin, 
-  validate(updateRegistrationStatusSchema), 
+router.put('/:registrationId/status',
+  authenticateToken,
+  requireAdmin,
+  validate(updateRegistrationStatusSchema),
   async (req, res) => {
     try {
       const { registrationId } = req.params;
       const { status, feedback } = req.body;
-      
+
       const registrationRef = db.collection('registrations').doc(registrationId);
       const registrationDoc = await registrationRef.get();
-      
+
       if (!registrationDoc.exists) {
         return res.status(404).json({
           success: false,
           error: 'Registration not found'
         });
       }
-      
+
       // Build update object without undefined values (Firestore rejects undefined)
       const updateData: any = {
         status,
@@ -343,15 +358,43 @@ router.put('/:registrationId/status',
       }
 
       await registrationRef.update(updateData);
-      
+
       // Send notification email
       const registrationData = registrationDoc.data() as Registration;
       const userDoc = await db.collection('users').doc(registrationData.userId).get();
       const userData = userDoc.data();
-      
+
       const hackathonDoc = await db.collection('hackathons').doc(registrationData.hackathonId).get();
       const hackathonData = hackathonDoc.data();
-      
+
+      // Update streaks if registration is approved
+      if (status === 'approved') {
+        try {
+          const { updateStreaks } = await import('../services/gamification.js');
+          // Update weekly streak
+          await updateStreaks(registrationData.userId, 'weekly');
+          // Update hackathon streak
+          await updateStreaks(registrationData.userId, 'hackathon');
+
+          // Also update streaks for team members
+          if (registrationData.teamMembers && Array.isArray(registrationData.teamMembers)) {
+            for (const member of registrationData.teamMembers) {
+              if (member.userId && member.userId !== registrationData.userId) {
+                try {
+                  await updateStreaks(member.userId, 'weekly');
+                  await updateStreaks(member.userId, 'hackathon');
+                } catch (err) {
+                  console.error('Error updating streaks for team member', member.userId, err);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Error updating streaks:', err);
+          // Don't fail the request if streak update fails
+        }
+      }
+
       if (userData && hackathonData) {
         try {
           const mailContext = {
@@ -362,16 +405,16 @@ router.put('/:registrationId/status',
             teamName: registrationData.teamName
           };
 
-          console.log('Sending registration status email', {
-            to: userData.email,
-            template: status === 'approved' ? 'registration-approved' : 'registration-update',
-            context: mailContext
-          });
+          const templateName = status === 'approved' ? 'registration-approved' :
+            status === 'rejected' ? 'registration-rejected' : 'registration-status-update';
+
+          const subjectLabel = status === 'approved' ? 'Approved' :
+            status === 'rejected' ? 'Rejected' : 'Update';
 
           await sendEmail({
             to: userData.email,
-            subject: `Registration ${status === 'approved' ? 'Approved' : 'Update'}: ${hackathonData.title}`,
-            template: status === 'approved' ? 'registration-approved' : 'registration-update',
+            subject: `Registration ${subjectLabel}: ${hackathonData.title}`,
+            template: templateName,
             context: mailContext
           });
         } catch (emailErr) {
@@ -382,14 +425,14 @@ router.put('/:registrationId/status',
           // Don't fail the whole request due to email problems; respond success but note the email failure in logs
         }
       }
-      
+
       const response: ApiResponse = {
         success: true,
         message: 'Registration status updated successfully'
       };
-      
+
       res.json(response);
-      
+
     } catch (error) {
       console.error('Update registration status error:', error);
       res.status(500).json({

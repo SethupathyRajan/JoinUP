@@ -4,13 +4,13 @@ import {
   authenticateToken, 
   sensitiveOperationLimiter 
 } from '../middleware/auth.js';
-import { 
-  validate, 
-  loginSchema, 
-  registerSchema, 
-  changePasswordSchema, 
+import {
+  validate,
+  loginSchema,
+  registerSchema,
+  changePasswordSchema,
   forgotPasswordSchema,
-  resetPasswordSchema 
+  resetPasswordSchema
 } from '../utils/validation.js';
 import { sendEmail } from '../services/email.js';
 import { generateResetToken } from '../utils/crypto.js';
@@ -340,7 +340,7 @@ router.post('/reset-password', async (req, res) => {
 
     // Get user from Firebase Auth
     const userRecord = await adminAuth.getUserByEmail(email);
-    
+
     // Update password in Firebase Auth
     await adminAuth.updateUser(userRecord.uid, {
       password: newPassword
@@ -480,10 +480,10 @@ router.put('/update-profile', authenticateToken, async (req, res) => {
 });
 
 // Change password
-router.post('/change-password', 
-  authenticateToken, 
+router.post('/change-password',
+  authenticateToken,
   sensitiveOperationLimiter,
-  validate(changePasswordSchema), 
+  validate(changePasswordSchema),
   async (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;
@@ -492,7 +492,7 @@ router.post('/change-password',
       // Verify current password by attempting to sign in
       try {
         await adminAuth.getUserByEmail(req.user!.email);
-        
+
         // Update password
         await adminAuth.updateUser(userId, {
           password: newPassword
@@ -534,9 +534,9 @@ router.post('/change-password',
 );
 
 // Forgot password
-router.post('/forgot-password', 
+router.post('/forgot-password',
   sensitiveOperationLimiter,
-  validate(forgotPasswordSchema), 
+  validate(forgotPasswordSchema),
   async (req, res) => {
     try {
       const { email } = req.body;
@@ -574,7 +574,7 @@ router.post('/forgot-password',
 
       // Send reset email
       const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
-      
+
       await sendEmail({
         to: email,
         subject: 'Reset Your JoinUP Password',
@@ -604,9 +604,9 @@ router.post('/forgot-password',
 );
 
 // Reset password
-router.post('/reset-password', 
+router.post('/reset-password',
   sensitiveOperationLimiter,
-  validate(resetPasswordSchema), 
+  validate(resetPasswordSchema),
   async (req, res) => {
     try {
       const { token, newPassword } = req.body;
@@ -626,7 +626,7 @@ router.post('/reset-password',
       }
 
       const resetData = resetDoc.docs[0].data();
-      
+
       // Check if token has expired
       if (new Date() > resetData.expiresAt.toDate()) {
         return res.status(400).json({
@@ -720,6 +720,33 @@ router.post('/logout', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Logout failed'
+    });
+  }
+});
+
+// Test email configuration
+router.get('/test-email', authenticateToken, async (req, res) => {
+  try {
+    await sendEmail({
+      to: req.user!.email,
+      subject: 'SMTP Test - JoinUP',
+      template: 'welcome',
+      context: {
+        userName: req.user!.name,
+        loginUrl: `${process.env.CLIENT_URL}/login`
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Test email sent successfully to ${req.user!.email}`
+    });
+  } catch (error: any) {
+    console.error('SMTP test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'SMTP test failed',
+      details: error.message
     });
   }
 });

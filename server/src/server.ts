@@ -13,15 +13,16 @@ import { getAuth } from 'firebase-admin/auth';
 dotenv.config();
 
 // Import routes
-import authRoutes from './routes/auth';
-import userRoutes from './routes/user';
-import hackathonRoutes from './routes/hackathon';
-import registrationRoutes from './routes/registration';
-import gamificationRoutes from './routes/gamification';
-import notificationRoutes from './routes/notification';
-import analyticsRoutes from './routes/analytics';
-import uploadRoutes from './routes/upload';
-import webScrapingRoutes from './routes/webscraping';
+import authRoutes from './routes/auth.js';
+import userRoutes from './routes/user.js';
+import hackathonRoutes from './routes/hackathon.js';
+import registrationRoutes from './routes/registration.js';
+import gamificationRoutes from './routes/gamification.js';
+import notificationRoutes from './routes/notification.js';
+import analyticsRoutes from './routes/analytics.js';
+import uploadRoutes from './routes/upload.js';
+import webScrapingRoutes from './routes/webscraping.js';
+import submissionsRoutes from './routes/submissions.js';
 
 // Initialize Firebase Admin
 if (!getApps().length) {
@@ -44,6 +45,7 @@ if (!getApps().length) {
 }
 
 export const db = getFirestore();
+db.settings({ ignoreUndefinedProperties: true });
 export const adminAuth = getAuth();
 
 const app = express();
@@ -64,7 +66,7 @@ app.use(morgan('combined'));
 app.use(cors({
   origin: function (origin, callback) {
     console.log('🔍 CORS Origin:', origin);
-    
+
     const allowedOrigins = [
       'http://localhost:5173',
       'http://localhost:5174',
@@ -75,7 +77,7 @@ app.use(cors({
       process.env.CLIENT_URL,
       undefined // Allow requests with no origin (like mobile apps, curl, postman)
     ].filter(Boolean);
-    
+
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -86,8 +88,8 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
+    'Content-Type',
+    'Authorization',
     'X-Requested-With',
     'Accept',
     'Origin',
@@ -111,22 +113,22 @@ app.use((req, res, next) => {
 app.options('*', (req, res) => {
   console.log('🚀 Preflight OPTIONS request for:', req.path);
   console.log('📊 Headers:', req.headers);
-  
+
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400');
-  
+
   res.status(204).end();
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV 
+    environment: process.env.NODE_ENV
   });
 });
 
@@ -140,6 +142,7 @@ app.use('/api/notification', notificationRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/webscraping', webScrapingRoutes);
+app.use('/api/submissions', submissionsRoutes);
 
 // Error handling middleware
 app.use((err: unknown, req: express.Request, res: express.Response) => {
@@ -163,8 +166,8 @@ app.use((err: unknown, req: express.Request, res: express.Response) => {
   if (error.name === 'ValidationError' && error.details && error.details[0]) {
     return res.status(400).json({ error: error.details[0].message });
   }
-  
-  res.status(500).json({ 
+
+  res.status(500).json({
     error: 'Internal server error',
     ...(process.env.NODE_ENV === 'development' && { details: error.message })
   });
