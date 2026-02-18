@@ -71,6 +71,7 @@ export const LeaderboardPage: React.FC = () => {
   };
 
   const handleUserClick = (userId: string) => {
+    // Force a full navigation to ensure profile component re-mounts or updates
     navigate(`/profile/${userId}`);
   };
 
@@ -105,11 +106,10 @@ export const LeaderboardPage: React.FC = () => {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg font-medium capitalize transition-colors ${
-                activeTab === tab
+              className={`px-4 py-2 rounded-lg font-medium capitalize transition-colors ${activeTab === tab
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               {tab}
             </button>
@@ -125,11 +125,10 @@ export const LeaderboardPage: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`relative bg-gradient-to-br ${
-              index === 0 ? 'from-yellow-400 to-yellow-600' :
-              index === 1 ? 'from-gray-400 to-gray-600' :
-              'from-orange-400 to-orange-600'
-            } rounded-xl p-6 text-white text-center overflow-hidden`}
+            className={`relative bg-gradient-to-br ${index === 0 ? 'from-yellow-400 to-yellow-600' :
+                index === 1 ? 'from-gray-400 to-gray-600' :
+                  'from-orange-400 to-orange-600'
+              } rounded-xl p-6 text-white text-center overflow-hidden`}
           >
             <div className="relative z-10">
               <div className="text-6xl mb-2">{getRankIcon(user.rank)}</div>

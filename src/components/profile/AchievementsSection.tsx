@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Award, Target, Flame, Star, Zap } from 'lucide-react';
 import { Achievement, Badge } from '../../types';
+import { formatDate } from '../../utils/dateUtils';
 
 interface AchievementsSectionProps {
   achievements: Achievement[];
@@ -57,8 +58,14 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({
     }
   };
 
-  const topAchievements = achievements
-    .sort((a, b) => new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime())
+  const getTime = (date: any) => {
+    if (!date) return 0;
+    if (typeof date === 'object' && '_seconds' in date) return date._seconds * 1000;
+    return new Date(date).getTime();
+  };
+
+  const topAchievements = [...achievements]
+    .sort((a, b) => getTime(b.unlockedAt) - getTime(a.unlockedAt))
     .slice(0, 3);
 
   return (
@@ -102,7 +109,7 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({
                         {achievement.category}
                       </span>
                       <span className="ml-3">
-                        Unlocked {new Date(achievement.unlockedAt).toLocaleDateString()}
+                        Unlocked {formatDate(achievement.unlockedAt)}
                       </span>
                     </div>
                   </div>

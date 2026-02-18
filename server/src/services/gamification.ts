@@ -1,4 +1,5 @@
 import { db } from '../server.js';
+import { FieldValue } from 'firebase-admin/firestore';
 import { User, GameStats, Badge, Achievement, UserStreak, LeaderboardEntry, CompetitionAchievement } from '../models/types.js';
 import { sendEmail } from './email.js';
 
@@ -186,17 +187,17 @@ export const BADGE_DEFINITIONS: Badge[] = [
 // Get user's current level based on points
 export const calculateLevel = (points: number): { level: number; name: string; nextLevelPoints: number } => {
   let currentLevel = LEVEL_THRESHOLDS[0];
-  
+
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
     if (points >= LEVEL_THRESHOLDS[i].minPoints) {
       currentLevel = LEVEL_THRESHOLDS[i];
       break;
     }
   }
-  
+
   const nextLevel = LEVEL_THRESHOLDS.find(level => level.level === currentLevel.level + 1);
   const nextLevelPoints = nextLevel ? nextLevel.minPoints : currentLevel.minPoints;
-  
+
   return {
     level: currentLevel.level,
     name: currentLevel.name,
@@ -209,11 +210,11 @@ export const awardPoints = async (userId: string, points: number, reason: string
   try {
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
-    
+
     if (!userDoc.exists) {
       throw new Error('User not found');
     }
-    
+
     const userData = userDoc.data() as User;
     if (!userData.gameStats) {
       throw new Error('User game stats not initialized');
@@ -221,17 +222,17 @@ export const awardPoints = async (userId: string, points: number, reason: string
     const currentLevel = calculateLevel(userData.gameStats.points);
     const newPoints = userData.gameStats.points + points;
     const newLevel = calculateLevel(newPoints);
-    
+
     // Check for level up
     const leveledUp = newLevel.level > currentLevel.level;
-    
+
     // Update user points and level
     await userRef.update({
       'gameStats.points': newPoints,
       'gameStats.level': newLevel.level,
       updatedAt: new Date()
     });
-    
+
     // Log the point award
     await db.collection('pointsHistory').add({
       userId,
@@ -244,7 +245,7 @@ export const awardPoints = async (userId: string, points: number, reason: string
       oldLevel: currentLevel.level,
       newLevel: newLevel.level
     });
-    
+
     // Send level up notification if applicable
     if (leveledUp) {
       await createNotification(userId, {
@@ -252,7 +253,7 @@ export const awardPoints = async (userId: string, points: number, reason: string
         message: `Congratulations! You've reached level ${newLevel.level} and earned the title "${newLevel.name}".`,
         type: 'achievement'
       });
-      
+
       // Send email notification
       await sendEmail({
         to: userData.email,
@@ -267,10 +268,10 @@ export const awardPoints = async (userId: string, points: number, reason: string
         }
       });
     }
-    
+
     // Check for new achievements
     await checkAndAwardAchievements(userId);
-    
+
   } catch (error) {
     console.error('Error awarding points:', error);
     throw error;
@@ -282,34 +283,39 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
   try {
     const userRef = db.collection('users').doc(userId);
     const userDoc = await userRef.get();
-    
+
     if (!userDoc.exists) {
       throw new Error('User not found');
     }
-    
+
     const userData = userDoc.data() as User;
     if (!userData.gameStats) {
       throw new Error('User game stats not initialized');
     }
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+<<<<<<< HEAD
     
     const updates: Record<string, unknown> = {
+=======
+
+    let updates: any = {
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
       'gameStats.streaks.lastUpdated': now,
       updatedAt: now
     };
-    
+
     if (activityType === 'login') {
       const lastUpdated = userData.gameStats.streaks.lastUpdated;
       const lastUpdatedDate = lastUpdated ? new Date(lastUpdated.getFullYear(), lastUpdated.getMonth(), lastUpdated.getDate()) : null;
-      
+
       // Check if this is a new day
       if (!lastUpdatedDate || lastUpdatedDate.getTime() !== today.getTime()) {
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        
+
         let newDailyStreak = 1;
-        
+
         // If logged in yesterday, increment streak
         if (lastUpdatedDate && lastUpdatedDate.getTime() === yesterday.getTime()) {
           newDailyStreak = (userData.gameStats.streaks.daily || 0) + 1;
@@ -317,9 +323,9 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
           // Streak broken, reset to 1
           newDailyStreak = 1;
         }
-        
+
         updates['gameStats.streaks.daily'] = newDailyStreak;
-        
+
         // Award bonus points for streak milestones
         if (newDailyStreak === 7) {
           await awardPoints(userId, POINTS.WEEKLY_LOGIN_BONUS_7_DAYS, '7-day login streak bonus');
@@ -347,15 +353,15 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
     } else if (activityType === 'weekly') {
       // Weekly streak: consecutive weeks with at least one activity
       const lastUpdated = userData.gameStats.streaks.lastUpdated;
-      
+
       if (lastUpdated) {
         const lastWeekStart = getWeekStart(lastUpdated);
         const currentWeekStart = getWeekStart(now);
         const previousWeekStart = new Date(currentWeekStart);
         previousWeekStart.setDate(previousWeekStart.getDate() - 7);
-        
+
         let newWeeklyStreak = 1;
-        
+
         // If last activity was in the previous week, increment streak
         if (lastWeekStart.getTime() === previousWeekStart.getTime()) {
           newWeeklyStreak = (userData.gameStats.streaks.weekly || 0) + 1;
@@ -366,9 +372,9 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
           // Same week, maintain current streak
           newWeeklyStreak = userData.gameStats.streaks.weekly || 1;
         }
-        
+
         updates['gameStats.streaks.weekly'] = newWeeklyStreak;
-        
+
         // Award bonus points for weekly streak milestones
         if (newWeeklyStreak === 4) {
           await awardPoints(userId, 100, '4-week streak bonus');
@@ -400,9 +406,9 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
       // This should be called when a registration is approved
       const currentStreak = userData.gameStats.streaks.hackathon || 0;
       const newHackathonStreak = currentStreak + 1;
-      
+
       updates['gameStats.streaks.hackathon'] = newHackathonStreak;
-      
+
       // Award bonus points for hackathon streak milestones
       if (newHackathonStreak === 3) {
         await awardPoints(userId, 150, '3-hackathon streak bonus');
@@ -427,9 +433,9 @@ export const updateStreaks = async (userId: string, activityType: 'login' | 'wee
         });
       }
     }
-    
+
     await userRef.update(updates);
-    
+
   } catch (error) {
     console.error('Error updating streaks:', error);
     throw error;
@@ -522,16 +528,16 @@ export const checkAndAwardAchievements = async (userId: string): Promise<void> =
 
 // Process competition results and award points
 export const processCompetitionResult = async (
-  userId: string, 
-  hackathonId: string, 
+  userId: string,
+  hackathonId: string,
   achievements: CompetitionAchievement[]
 ): Promise<void> => {
   try {
     let totalPointsAwarded = 0;
-    
+
     for (const achievement of achievements) {
       let points = 0;
-      
+
       switch (achievement.type) {
         case 'winner':
           points = POINTS.WINNER;
@@ -552,13 +558,13 @@ export const processCompetitionResult = async (
           points = POINTS.SPECIAL_RECOGNITION;
           break;
       }
-      
+
       if (points > 0) {
         await awardPoints(userId, points, `${achievement.title} - ${achievement.type}`);
         totalPointsAwarded += points;
       }
     }
-    
+
     // Update total wins if user won
     if (achievements.some(a => a.type === 'winner')) {
       const userRef = db.collection('users').doc(userId);
@@ -577,9 +583,9 @@ export const processCompetitionResult = async (
         updatedAt: new Date()
       });
     }
-    
+
     console.log(`Awarded ${totalPointsAwarded} points to user ${userId} for competition ${hackathonId}`);
-    
+
   } catch (error) {
     console.error('Error processing competition result:', error);
     throw error;
@@ -588,32 +594,32 @@ export const processCompetitionResult = async (
 
 // Get leaderboard
 export const getLeaderboard = async (
-  limit: number = 50, 
-  department?: string, 
+  limit: number = 50,
+  department?: string,
   year?: number
 ): Promise<LeaderboardEntry[]> => {
   try {
     let query = db.collection('users')
       .orderBy('gameStats.points', 'desc')
       .limit(limit);
-    
+
     if (department) {
       query = query.where('department', '==', department);
     }
-    
+
     if (year) {
       query = query.where('year', '==', year);
     }
-    
+
     const snapshot = await query.get();
-    
+
     const leaderboard: LeaderboardEntry[] = snapshot.docs.map((doc, index) => {
       const userData = doc.data() as User;
       if (!userData.gameStats) {
         throw new Error('User game stats not initialized');
       }
       return {
-        userId: userData.id,
+        userId: doc.id,
         userName: userData.name,
         department: userData.department,
         year: userData.year,
@@ -625,9 +631,9 @@ export const getLeaderboard = async (
         streaks: userData.gameStats.streaks
       };
     });
-    
+
     return leaderboard;
-    
+
   } catch (error) {
     console.error('Error getting leaderboard:', error);
     throw error;

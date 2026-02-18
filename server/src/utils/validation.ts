@@ -116,34 +116,38 @@ export const updateProfileSchema = Joi.object({
 export const createHackathonSchema = Joi.object({
   title: Joi.string().min(5).max(200).required(),
   description: Joi.string().min(10).max(5000).required(),
-  startDate: Joi.date().greater('now').required(),
-  endDate: Joi.date().greater(Joi.ref('startDate')).required(),
+  startDate: Joi.date().required(),
+  endDate: Joi.date().min(Joi.ref('startDate')).required(),
   registrationDeadline: Joi.date().less(Joi.ref('startDate')).required(),
   maxTeamSize: Joi.number().integer().min(1).max(10).required(),
   minTeamSize: Joi.number().integer().min(1).max(Joi.ref('maxTeamSize')).required(),
   tags: Joi.array().items(Joi.string().min(2).max(50)).min(1).max(10).required(),
-  prizeMoney: Joi.number().positive().optional(),
+  prizeMoney: Joi.number().min(0).optional(),
   location: Joi.string().max(200).optional(),
   requirements: Joi.array().items(Joi.string().max(500)).optional(),
   category: Joi.string().max(100).required(),
   difficulty: Joi.string().valid('beginner', 'intermediate', 'advanced').required(),
+  totalSlots: Joi.number().integer().min(1).optional(),
+  gformLink: Joi.string().uri().allow('').optional(),
 });
 
 export const updateHackathonSchema = Joi.object({
   title: Joi.string().min(5).max(200).optional(),
   description: Joi.string().min(10).max(5000).optional(),
-  startDate: Joi.date().greater('now').optional(),
+  startDate: Joi.date().optional(),
   endDate: Joi.date().optional(),
   registrationDeadline: Joi.date().optional(),
   maxTeamSize: Joi.number().integer().min(1).max(10).optional(),
   minTeamSize: Joi.number().integer().min(1).optional(),
   tags: Joi.array().items(Joi.string().min(2).max(50)).min(1).max(10).optional(),
-  prizeMoney: Joi.number().positive().optional(),
+  prizeMoney: Joi.number().min(0).optional(),
   location: Joi.string().max(200).optional(),
   requirements: Joi.array().items(Joi.string().max(500)).optional(),
   category: Joi.string().max(100).optional(),
   difficulty: Joi.string().valid('beginner', 'intermediate', 'advanced').optional(),
   status: Joi.string().valid('upcoming', 'ongoing', 'completed', 'archived').optional(),
+  totalSlots: Joi.number().integer().min(1).optional(),
+  gformLink: Joi.string().uri().allow('').optional(),
 }).min(1);
 
 // Registration validation schemas

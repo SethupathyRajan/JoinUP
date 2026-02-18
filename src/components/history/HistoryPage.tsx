@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   DocumentTextIcon,
   CalendarIcon,
   FunnelIcon,
@@ -8,13 +8,16 @@ import {
   TrophyIcon,
   CheckCircleIcon,
   ClockIcon,
-  XCircleIcon
+  XCircleIcon,
+  UserIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
+import { userProfileService } from '../../services/userProfileService';
 import { motion } from 'framer-motion';
-import { format } from 'date-fns';
+import { formatDate } from '../../utils/dateUtils';
 import { registrationService } from '../../services/registrationService';
 import { hackathonService } from '../../services/hackathonService';
-import { Registration, Hackathon } from '../../types';
+import { Registration } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { generateParticipationReport } from '../../utils/pdfGenerator';
 import toast from 'react-hot-toast';
@@ -24,7 +27,7 @@ interface HistoryItem extends Registration {
 }
 
 export const HistoryPage: React.FC = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDateRange, setFilterDateRange] = useState('all');
@@ -32,6 +35,12 @@ export const HistoryPage: React.FC = () => {
   const [participationHistory, setParticipationHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [exportingPDF, setExportingPDF] = useState(false);
+
+  // Admin Search State
+  const [adminSearchQuery, setAdminSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // Helper function to convert Firestore timestamp to Date
   const toDate = (value: any): Date => {
@@ -51,7 +60,7 @@ export const HistoryPage: React.FC = () => {
       try {
         setLoading(true);
         const data = await registrationService.getRegistrations();
-        
+
         // Convert Firestore timestamps and fetch hackathon details
         const enrichedData = await Promise.all(
           data.map(async (item: any) => {
@@ -105,18 +114,18 @@ export const HistoryPage: React.FC = () => {
 
   const filteredHistory = participationHistory.filter(item => {
     const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       (item.hackathonTitle?.toLowerCase().includes(searchLower)) ||
       (item.hackathonId.toLowerCase().includes(searchLower)) ||
       (item.teamName?.toLowerCase().includes(searchLower));
-    
+
     const matchesStatus = filterStatus === 'all' || item.status === filterStatus;
-    
+
     let matchesDate = true;
     if (filterDateRange !== 'all') {
       const now = new Date();
       const itemDate = item.submittedAt;
-      
+
       switch (filterDateRange) {
         case 'this_year':
           matchesDate = itemDate.getFullYear() === now.getFullYear();
@@ -131,7 +140,7 @@ export const HistoryPage: React.FC = () => {
           break;
       }
     }
-    
+
     return matchesSearch && matchesStatus && matchesDate;
   });
 
@@ -155,16 +164,7 @@ export const HistoryPage: React.FC = () => {
     }
   };
 
-  const getResultColor = (result: string) => {
-    switch (result) {
-      case 'Winner': return 'text-yellow-600 font-bold';
-      case 'Runner-up': return 'text-orange-600 font-bold';
-      case 'Participant': return 'text-blue-600';
-      case 'Pending Review': return 'text-yellow-600';
-      case 'Not Selected': return 'text-red-600';
-      default: return 'text-gray-600';
-    }
-  };
+
 
   const handleExportPDF = async () => {
     if (!currentUser) {
@@ -217,23 +217,171 @@ export const HistoryPage: React.FC = () => {
     }
   };
 
+
+
+  // Admin Search Functions
+  const handleAdminSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminSearchQuery.trim()) return;
+
+    try {
+      setIsSearching(true);
+      const results = await userProfileService.searchUsers(adminSearchQuery);
+      setSearchResults(results);
+      if (results.length === 0) {
+        toast.error('No students found');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Failed to search students');
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectStudent = async (student: any) => {
+    setSelectedStudent(student);
+    setSearchResults([]); // Clear results to show selected view
+    setAdminSearchQuery('');
+
+    try {
+      setLoading(true);
+      // Fetch selected student's history
+      const participations = await userProfileService.getUserParticipations(student.id);
+
+      // Transform data similar to fetchHistory
+      const enrichedHistory = await Promise.all(
+        participations.map(async (item: any) => {
+          const historyItem: HistoryItem = {
+            ...item,
+            submittedAt: toDate(item.submittedAt),
+            reviewedAt: item.reviewedAt ? toDate(item.reviewedAt) : undefined,
+          };
+
+          try {
+            const hackathon = await hackathonService.getHackathon(item.hackathonId);
+            historyItem.hackathonTitle = hackathon.title;
+          } catch (err) {
+            historyItem.hackathonTitle = item.hackathonId;
+          }
+
+          return historyItem;
+        })
+      );
+
+      setParticipationHistory(enrichedHistory);
+    } catch (error) {
+      console.error('Error fetching student history:', error);
+      toast.error('Failed to load student history');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearSelectedStudent = () => {
+    setSelectedStudent(null);
+    setParticipationHistory([]); // Or reset to empty
+    // If admin wants to see their own history, they can't easily switch back in this view 
+    // unless we strictly separate "My History" vs "Student History" tabs.
+    // For now, let's just clear the view.
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Participation History</h1>
-          <p className="text-gray-600 mt-1">Track your competition journey and achievements</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {isAdmin ? 'Student Records & History' : 'Participation History'}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {isAdmin
+              ? 'Search and manage student participation records'
+              : 'Track your competition journey and achievements'}
+          </p>
         </div>
-        <button
-          onClick={handleExportPDF}
-          disabled={exportingPDF || participationHistory.length === 0}
-          className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ArrowDownTrayIcon className="h-5 w-5" />
-          <span>{exportingPDF ? 'Generating...' : 'Export PDF'}</span>
-        </button>
+        {(participationHistory.length > 0 || selectedStudent) && (
+          <button
+            onClick={handleExportPDF}
+            disabled={exportingPDF || participationHistory.length === 0}
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5" />
+            <span>{exportingPDF ? 'Generating...' : 'Export Record PDF'}</span>
+          </button>
+        )}
       </div>
+
+      {/* Admin Search Section */}
+      {isAdmin && !selectedStudent && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Find a Student</h2>
+          <form onSubmit={handleAdminSearch} className="flex gap-4">
+            <div className="relative flex-1">
+              <UserIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={adminSearchQuery}
+                onChange={(e) => setAdminSearchQuery(e.target.value)}
+                placeholder="Search by name, roll number, or email..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
+            >
+              {isSearching ? 'Searching...' : 'Search'}
+            </button>
+          </form>
+
+          {/* Search Results */}
+          {searchResults.length > 0 && (
+            <div className="mt-4 border border-gray-100 rounded-lg max-h-60 overflow-y-auto">
+              {searchResults.map((student) => (
+                <div
+                  key={student.id}
+                  onClick={() => handleSelectStudent(student)}
+                  className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                      {student.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{student.name}</p>
+                      <p className="text-xs text-gray-500">{student.rollNumber} • {student.department}</p>
+                    </div>
+                  </div>
+                  <ChevronRightIcon className="h-4 w-4 text-gray-400" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Selected Student Banner */}
+      {selectedStudent && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="h-10 w-10 rounded-full bg-blue-200 flex items-center justify-center text-blue-700 font-bold">
+              {selectedStudent.name.charAt(0)}
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900">Viewing Records: {selectedStudent.name}</h3>
+              <p className="text-sm text-blue-700">{selectedStudent.email} • {selectedStudent.rollNumber}</p>
+            </div>
+          </div>
+          <button
+            onClick={clearSelectedStudent}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            Search Another Student
+          </button>
+        </div>
+      )}
 
       {/* Search and Filters */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -403,12 +551,12 @@ export const HistoryPage: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="flex items-center space-x-2 text-sm text-gray-600">
                       <CalendarIcon className="h-4 w-4" />
-                      <span>Registered: {format(new Date(item.submittedAt), 'MMM dd, yyyy')}</span>
+                      <span>Registered: {formatDate(item.submittedAt)}</span>
                     </div>
                     {item.reviewedAt && (
                       <div className="flex items-center space-x-2 text-sm text-gray-600">
                         <CalendarIcon className="h-4 w-4" />
-                        <span>Reviewed: {format(new Date(item.reviewedAt), 'MMM dd, yyyy')}</span>
+                        <span>Reviewed: {formatDate(item.reviewedAt)}</span>
                       </div>
                     )}
                   </div>
@@ -419,8 +567,8 @@ export const HistoryPage: React.FC = () => {
                       <p className="text-sm text-gray-600 mb-1">Team Members:</p>
                       <div className="flex flex-wrap gap-2">
                         {item.teamMembers.map((member: any, idx: number) => {
-                          const memberName = typeof member === 'string' 
-                            ? `Member ${idx + 1}` 
+                          const memberName = typeof member === 'string'
+                            ? `Member ${idx + 1}`
                             : (member.name || member.email || `Member ${idx + 1}`);
                           const memberRoll = typeof member === 'object' ? (member.rollNumber || member.registerNumber) : null;
                           return (
@@ -435,11 +583,10 @@ export const HistoryPage: React.FC = () => {
 
                   {/* Priority */}
                   <div className="mb-3">
-                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
-                      item.priority === 'high' ? 'bg-red-100 text-red-800' :
+                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${item.priority === 'high' ? 'bg-red-100 text-red-800' :
                       item.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
+                        'bg-green-100 text-green-800'
+                      }`}>
                       {item.priority} priority
                     </span>
                   </div>
@@ -455,7 +602,7 @@ export const HistoryPage: React.FC = () => {
                 {/* Action Buttons */}
                 <div className="flex flex-col space-y-2 min-w-0 lg:min-w-[120px]">
                   {item.status === 'approved' && (
-                    <button 
+                    <button
                       onClick={() => handleDownloadCertificate(item.id)}
                       className="px-3 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors"
                     >

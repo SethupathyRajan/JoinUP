@@ -461,6 +461,71 @@ export const emailTemplates = {
       The JoinUP Team
       Thiagarajar College of Engineering
     `
+  },
+  'level-up': {
+    subject: '🎉 Level Up! - JoinUP',
+    html: (context: { userName: string; oldLevel: number; newLevel: number; levelName: string; totalPoints: number }) => `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 32px;">Level Up!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 18px;">Congratulations on reaching Level ${context.newLevel}!</p>
+        </div>
+        
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; text-align: center;">
+          <h2 style="color: #333; margin-top: 0;">Hello ${context.userName},</h2>
+          
+          <div style="margin: 30px 0;">
+            <div style="font-size: 64px; margin-bottom: 10px;">🏆</div>
+            <div style="font-size: 24px; font-weight: bold; color: #764ba2;">${context.levelName}</div>
+            <p style="color: #666; font-size: 16px;">New Achievement Unlocked</p>
+          </div>
+          
+          <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e0e0e0;">
+            <div style="display: flex; justify-content: space-around; align-items: center;">
+              <div>
+                <div style="font-size: 14px; color: #888;">Level</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">${context.oldLevel} → ${context.newLevel}</div>
+              </div>
+              <div style="width: 1px; height: 40px; background: #eee;"></div>
+              <div>
+                <div style="font-size: 14px; color: #888;">Total Points</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">${context.totalPoints}</div>
+              </div>
+            </div>
+          </div>
+          
+          <p style="color: #666; line-height: 1.6;">
+            Your dedication and participation are paying off! Keep competing and participating in events to reach higher levels and earn more exclusive rewards.
+          </p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="http://localhost:5173/leaderboard" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+              View Leaderboard
+            </a>
+          </div>
+          
+          <div style="border-top: 1px solid #ddd; padding-top: 20px; margin-top: 30px; color: #888; font-size: 14px;">
+            <p>Best regards,<br>The JoinUP Team</p>
+            <p>Thiagarajar College of Engineering</p>
+          </div>
+        </div>
+      </div>
+    `,
+    text: (context: { userName: string; oldLevel: number; newLevel: number; levelName: string; totalPoints: number }) => `
+      Hello ${context.userName},
+
+      Congratulations! You've leveled up on JoinUP!
+
+      New Level: ${context.newLevel}
+      Title: ${context.levelName}
+      Total Points: ${context.totalPoints}
+
+      Keep competing and participating in events to reach higher levels!
+
+      Best regards,
+      The JoinUP Team
+      Thiagarajar College of Engineering
+    `
   }
 };
 

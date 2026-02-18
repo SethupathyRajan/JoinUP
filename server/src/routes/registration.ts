@@ -234,6 +234,11 @@ router.post('/', authenticateToken, requireStudent, validate(createRegistrationS
 
     const docRef = await db.collection('registrations').add(registrationData);
 
+    // Increment registered teams count on hackathon document
+    await db.collection('hackathons').doc(hackathonId).update({
+      registeredTeams: require('firebase-admin').firestore.FieldValue.increment(1)
+    });
+
     // Award points for registration to all members
     const hasTeam = resolvedMembers && resolvedMembers.length > 1;
     const points = hasTeam ? POINTS.COMPLETE_TEAM_REGISTRATION : POINTS.REGISTER_COMPETITION;

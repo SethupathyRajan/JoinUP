@@ -72,7 +72,7 @@ router.get('/:userId/profile', authenticateToken, async (req, res) => {
     const userData = userDoc.data() as User;
 
     const sanitizedUser = {
-      id: userData.id,
+      id: userDoc.id,
       name: userData.name,
       email: userData.email,
       department: userData.department,
@@ -155,35 +155,35 @@ router.get('/:userId', authenticateToken, requireOwnershipOrAdmin('userId'), asy
 });
 
 // Update user profile
-router.put('/:userId', 
-  authenticateToken, 
-  requireOwnershipOrAdmin('userId'), 
-  validate(updateProfileSchema), 
+router.put('/:userId',
+  authenticateToken,
+  requireOwnershipOrAdmin('userId'),
+  validate(updateProfileSchema),
   async (req, res) => {
     try {
       const { userId } = req.params;
       const updates = req.body;
-      
+
       // Add updated timestamp
       const updateData = {
         ...updates,
         updatedAt: new Date()
       };
-      
+
       await db.collection('users').doc(userId).update(updateData);
-      
+
       // Get updated user data
       const updatedUserDoc = await db.collection('users').doc(userId).get();
       const updatedUserData = updatedUserDoc.data() as User;
-      
+
       const response: ApiResponse<{ user: User }> = {
         success: true,
         data: { user: updatedUserData },
         message: 'Profile updated successfully'
       };
-      
+
       res.json(response);
-      
+
     } catch (error) {
       console.error('Update user profile error:', error);
       res.status(500).json({
@@ -198,32 +198,32 @@ router.put('/:userId',
 router.get('/:userId/gamestats', authenticateToken, requireOwnershipOrAdmin('userId'), async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const userDoc = await db.collection('users').doc(userId).get();
-    
+
     if (!userDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-    
+
     const userData = userDoc.data() as User;
-    
+
     // Get recent points history
     const pointsHistoryQuery = await db.collection('pointsHistory')
       .where('userId', '==', userId)
       .orderBy('timestamp', 'desc')
       .limit(20)
       .get();
-    
+
     const pointsHistory = pointsHistoryQuery.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }));
-    
-    const response: ApiResponse<{ 
-      gameStats: any; 
+
+    const response: ApiResponse<{
+      gameStats: any;
       pointsHistory: any[];
     }> = {
       success: true,
@@ -233,9 +233,9 @@ router.get('/:userId/gamestats', authenticateToken, requireOwnershipOrAdmin('use
       },
       message: 'Game stats retrieved successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Get game stats error:', error);
     res.status(500).json({
@@ -246,22 +246,28 @@ router.get('/:userId/gamestats', authenticateToken, requireOwnershipOrAdmin('use
 });
 
 // Get user's participation history
-router.get('/:userId/participations', 
-  authenticateToken, 
+router.get('/:userId/participations',
+  authenticateToken,
   requireOwnershipOrAdmin('userId'),
   validateQuery(paginationSchema),
   async (req, res) => {
     try {
       const { userId } = req.params;
+<<<<<<< HEAD
       const queryParams = req.query;
       const page = Number(queryParams.page) || 1;
       const limit = Number(queryParams.limit) || 20;
       const sortBy = queryParams.sortBy as string | undefined;
       const sortOrder = (queryParams.sortOrder as 'asc' | 'desc') || 'desc';
       
+=======
+      const { page, limit, sortBy, sortOrder } = req.query as PaginationOptions;
+
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
       // Get user's registrations
       let dbQuery = db.collection('registrations')
         .where('userId', '==', userId);
+<<<<<<< HEAD
       
       // Apply sorting
       if (sortBy) {
@@ -279,22 +285,65 @@ router.get('/:userId/participations',
         .where('userId', '==', userId)
         .get();
       
+=======
+
+      // Execute query without orderBy to avoid index requirement for filtering by userId
+      // We will sort in memory after fetching
+      const snapshot = await query.get();
+
+      // Get all docs
+      let allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Sort in memory
+      allDocs.sort((a: any, b: any) => {
+        const dateA = a[sortBy || 'submittedAt']?.toDate ? a[sortBy || 'submittedAt'].toDate() : new Date(a[sortBy || 'submittedAt'] || 0);
+        const dateB = b[sortBy || 'submittedAt']?.toDate ? b[sortBy || 'submittedAt'].toDate() : new Date(b[sortBy || 'submittedAt'] || 0);
+
+        return sortOrder === 'asc'
+          ? dateA.getTime() - dateB.getTime()
+          : dateB.getTime() - dateA.getTime();
+      });
+
+      // Apply pagination in memory
+      const totalSize = allDocs.length;
+      const offset = (page - 1) * limit;
+      const paginatedDocs = allDocs.slice(offset, offset + limit);
+
+
+
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
       const participations = [];
-      
+
       // Fetch hackathon details for each registration
+<<<<<<< HEAD
       for (const doc of snapshot.docs) {
         const registration = { id: doc.id, ...doc.data() } as { id: string; hackathonId: string };
         const hackathonDoc = await db.collection('hackathons').doc(registration.hackathonId).get();
         const hackathonData = hackathonDoc.exists ? hackathonDoc.data() : null;
         
+=======
+      for (const doc of paginatedDocs) {
+        const registration = doc;
+        let hackathonData = null;
+
+        if (registration.hackathonId) {
+          try {
+            const hackathonDoc = await db.collection('hackathons').doc(registration.hackathonId).get();
+            hackathonData = hackathonDoc.exists ? hackathonDoc.data() : null;
+          } catch (e) {
+            console.warn(`Failed to fetch hackathon ${registration.hackathonId} for registration ${doc.id}`);
+          }
+        }
+
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
         participations.push({
           ...registration,
           hackathon: hackathonData
         });
       }
-      
+
       const totalPages = Math.ceil(totalSnapshot.size / limit);
-      
+
       const response: ApiResponse<{ participations: any[] }> = {
         success: true,
         data: { participations },
@@ -302,13 +351,13 @@ router.get('/:userId/participations',
         pagination: {
           page,
           limit,
-          total: totalSnapshot.size,
+          total: totalSize,
           totalPages
         }
       };
-      
+
       res.json(response);
-      
+
     } catch (error) {
       console.error('Get participations error:', error);
       res.status(500).json({
@@ -328,6 +377,7 @@ router.get('/', authenticateToken, async (req, res) => {
         error: 'Admin privileges required'
       });
     }
+<<<<<<< HEAD
     
     const queryParams = req.query;
     const search = queryParams.search as string | undefined;
@@ -338,39 +388,51 @@ router.get('/', authenticateToken, async (req, res) => {
     
     let dbQuery: Query<DocumentData> | CollectionReference<DocumentData> = db.collection('users');
     
+=======
+
+    const { search, department, year, page = 1, limit = 20 } = req.query as any;
+
+    let query = db.collection('users');
+
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
     // Apply filters
     if (department) {
       dbQuery = dbQuery.where('department', '==', department);
     }
-    
+
     if (year) {
       dbQuery = dbQuery.where('year', '==', parseInt(year));
     }
-    
+
     // For search, we'll get all matching docs and filter in memory
     // In production, consider using Algolia or similar for full-text search
+<<<<<<< HEAD
     const snapshot = await dbQuery.get();
     
+=======
+    const snapshot = await query.get();
+
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
     let users = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as User[];
-    
+
     // Apply text search if provided
     if (search) {
       const searchLower = search.toLowerCase();
-      users = users.filter(user => 
+      users = users.filter(user =>
         user.name.toLowerCase().includes(searchLower) ||
         user.email.toLowerCase().includes(searchLower) ||
         user.rollNumber.toLowerCase().includes(searchLower) ||
         user.registerNumber.includes(search)
       );
     }
-    
+
     // Apply pagination
     const offset = (page - 1) * limit;
     const paginatedUsers = users.slice(offset, offset + limit);
-    
+
     // Remove sensitive data
     const sanitizedUsers = paginatedUsers.map(user => ({
       id: user.id,
@@ -389,9 +451,9 @@ router.get('/', authenticateToken, async (req, res) => {
       } : undefined,
       createdAt: user.createdAt
     }));
-    
+
     const totalPages = Math.ceil(users.length / limit);
-    
+
     const response: ApiResponse<{ users: any[] }> = {
       success: true,
       data: { users: sanitizedUsers },
@@ -403,9 +465,9 @@ router.get('/', authenticateToken, async (req, res) => {
         totalPages
       }
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Search users error:', error);
     res.status(500).json({
@@ -466,59 +528,59 @@ router.get('/search', authenticateToken, async (req, res) => {
 router.delete('/:userId', authenticateToken, requireOwnershipOrAdmin('userId'), async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     // Get user data first
     const userDoc = await db.collection('users').doc(userId).get();
-    
+
     if (!userDoc.exists) {
       return res.status(404).json({
         success: false,
         error: 'User not found'
       });
     }
-    
+
     // Delete user from Firestore
     await db.collection('users').doc(userId).delete();
-    
+
     // Clean up related data (in a transaction for consistency)
     const batch = db.batch();
-    
+
     // Delete user's registrations
     const registrationsQuery = await db.collection('registrations')
       .where('userId', '==', userId)
       .get();
-    
+
     registrationsQuery.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
-    
+
     // Delete user's notifications
     const notificationsQuery = await db.collection('notifications')
       .where('userId', '==', userId)
       .get();
-    
+
     notificationsQuery.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
-    
+
     // Delete user's points history
     const pointsHistoryQuery = await db.collection('pointsHistory')
       .where('userId', '==', userId)
       .get();
-    
+
     pointsHistoryQuery.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
-    
+
     await batch.commit();
-    
+
     const response: ApiResponse = {
       success: true,
       message: 'User account deleted successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({

@@ -34,7 +34,7 @@ export interface Hackathon {
   registrationDeadline: Date;
   maxTeamSize: number;
   minTeamSize: number;
-  status: 'upcoming' | 'ongoing' | 'completed' | 'archived';
+  status: 'upcoming' | 'ongoing' | 'completed' | 'archived' | 'pending';
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;

@@ -128,6 +128,7 @@ const SAMPLE_HACKATHONS: any[] = [
 // Get all hackathons (public)
 router.get('/', async (req, res) => {
   try {
+<<<<<<< HEAD
     const { status, category, limit = 20, page = 1 } = req.query;
     
     const limitNum = Number(limit) || 20;
@@ -135,14 +136,20 @@ router.get('/', async (req, res) => {
     
     let dbQuery: Query<DocumentData> | CollectionReference<DocumentData> = db.collection('hackathons');
     
+=======
+    const { status, category, limit = 20, page = 1 } = req.query as any;
+
+    let query: any = db.collection('hackathons');
+
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
     if (status) {
       dbQuery = dbQuery.where('status', '==', status);
     }
-    
+
     if (category) {
       dbQuery = dbQuery.where('category', '==', category);
     }
-    
+
     // Apply pagination  
     const offset = (pageNum - 1) * limitNum;
     const snapshot = await dbQuery
@@ -150,12 +157,17 @@ router.get('/', async (req, res) => {
       .limit(limitNum)
       .offset(offset)
       .get();
+<<<<<<< HEAD
     
     let hackathons: Array<Record<string, unknown>> = snapshot.docs.map((doc) => ({
+=======
+
+    let hackathons: any[] = snapshot.docs.map(doc => ({
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
       id: doc.id,
       ...doc.data()
     }));
-    
+
     // If no hackathons found, return sample data for testing
     if (hackathons.length === 0) {
       // Expanded sample list for local testing
@@ -276,15 +288,15 @@ router.get('/', async (req, res) => {
         }
       ];
     }
-    
+
     const response: ApiResponse<{ hackathons: any[] }> = {
       success: true,
       data: { hackathons },
       message: 'Hackathons retrieved successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Get hackathons error:', error);
     res.status(500).json({
@@ -298,9 +310,9 @@ router.get('/', async (req, res) => {
 router.get('/:hackathonId', async (req, res) => {
   try {
     const { hackathonId } = req.params;
-    
+
     const hackathonDoc = await db.collection('hackathons').doc(hackathonId).get();
-    
+
     if (!hackathonDoc.exists) {
       // If collection is empty, try to return a sample hackathon matching the id
       const collectionSnapshot = await db.collection('hackathons').limit(1).get();
@@ -321,17 +333,17 @@ router.get('/:hackathonId', async (req, res) => {
         error: 'Hackathon not found'
       });
     }
-    
+
     const hackathonData = hackathonDoc.data();
-    
+
     const response: ApiResponse<{ hackathon: any }> = {
       success: true,
       data: { hackathon: { id: hackathonDoc.id, ...hackathonData } },
       message: 'Hackathon retrieved successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Get hackathon error:', error);
     res.status(500).json({
@@ -341,27 +353,52 @@ router.get('/:hackathonId', async (req, res) => {
   }
 });
 
-// Create hackathon (admin only)
-router.post('/', authenticateToken, requireAdmin, validate(createHackathonSchema), async (req, res) => {
+// Create hackathon
+router.post('/', authenticateToken, validate(createHackathonSchema), async (req, res) => {
   try {
+    const isAdmin = req.user?.isAdmin || false;
+
     const hackathonData: Omit<Hackathon, 'id'> = {
       ...req.body,
       createdBy: req.user!.id,
       createdAt: new Date(),
       updatedAt: new Date(),
-      status: 'upcoming'
+      status: isAdmin ? 'upcoming' : 'pending', // Students create pending competitions
+      registeredTeams: 1 // Initialize with creator's team
     };
-    
-    const docRef = await db.collection('hackathons').add(hackathonData);
-    
+
+    // Remove registrationDetails from hackathon document if present (it's for registration)
+    const { registrationDetails, ...cleanHackathonData } = hackathonData as any;
+
+    const docRef = await db.collection('hackathons').add(cleanHackathonData);
+
+    // Automatically register the creator
+    await db.collection('registrations').add({
+      userId: req.user!.id,
+      hackathonId: docRef.id,
+      teamName: registrationDetails?.teamName || 'Creator Team',
+      status: 'approved',
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+      members: [{
+        userId: req.user!.id,
+        name: req.user!.name || 'Creator',
+        email: req.user!.email,
+        role: 'leader',
+        status: 'accepted'
+      }]
+    });
+
     const response: ApiResponse<{ hackathonId: string }> = {
       success: true,
       data: { hackathonId: docRef.id },
-      message: 'Hackathon created successfully'
+      message: isAdmin
+        ? 'Hackathon created successfully'
+        : 'Competition request submitted for admin approval'
     };
-    
+
     res.status(201).json(response);
-    
+
   } catch (error) {
     console.error('Create hackathon error:', error);
     res.status(500).json({
@@ -371,25 +408,51 @@ router.post('/', authenticateToken, requireAdmin, validate(createHackathonSchema
   }
 });
 
+// Admin Review: Approve/Reject competition (admin only)
+router.patch('/:hackathonId/review', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { hackathonId } = req.params;
+    const { status, remarks } = req.body; // 'upcoming' or 'rejected'
+
+    if (!['upcoming', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid review status' });
+    }
+
+    await db.collection('hackathons').doc(hackathonId).update({
+      status,
+      adminRemarks: remarks || '',
+      updatedAt: new Date()
+    });
+
+    res.json({
+      success: true,
+      message: `Competition successfully ${status === 'upcoming' ? 'approved' : 'rejected'}`
+    });
+  } catch (error) {
+    console.error('Review hackathon error:', error);
+    res.status(500).json({ success: false, error: 'Failed to review competition' });
+  }
+});
+
 // Update hackathon (admin only)
 router.put('/:hackathonId', authenticateToken, requireAdmin, validate(updateHackathonSchema), async (req, res) => {
   try {
     const { hackathonId } = req.params;
-    
+
     const updateData = {
       ...req.body,
       updatedAt: new Date()
     };
-    
+
     await db.collection('hackathons').doc(hackathonId).update(updateData);
-    
+
     const response: ApiResponse = {
       success: true,
       message: 'Hackathon updated successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Update hackathon error:', error);
     res.status(500).json({
@@ -403,16 +466,16 @@ router.put('/:hackathonId', authenticateToken, requireAdmin, validate(updateHack
 router.delete('/:hackathonId', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { hackathonId } = req.params;
-    
+
     await db.collection('hackathons').doc(hackathonId).delete();
-    
+
     const response: ApiResponse = {
       success: true,
       message: 'Hackathon deleted successfully'
     };
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Delete hackathon error:', error);
     res.status(500).json({

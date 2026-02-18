@@ -11,12 +11,12 @@ import {
   UsersIcon,
   TrophyIcon
 } from '@heroicons/react/24/outline';
+import { formatDate } from '../../utils/dateUtils';
 import { hackathonService } from '../../services/hackathonService';
 import { registrationService } from '../../services/registrationService';
 import { apiRequest, API_CONFIG } from '../../config/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
-import { format } from 'date-fns';
 
 const RegisterPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -224,19 +224,6 @@ const RegisterPage: React.FC = () => {
 
   const totalTeamSize = selectedMembers.length + 1; // +1 for current user (leader)
 
-  // Helper function to safely convert to Date
-  const toDate = (value: any): Date => {
-    if (!value) return new Date();
-    if (value instanceof Date) return value;
-    if (value.toDate && typeof value.toDate === 'function') {
-      return value.toDate();
-    }
-    if (typeof value === 'string' || typeof value === 'number') {
-      return new Date(value);
-    }
-    return new Date();
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -267,7 +254,7 @@ const RegisterPage: React.FC = () => {
             <div className="flex items-center space-x-2 text-gray-600">
               <CalendarIcon className="h-5 w-5" />
               <span className="text-sm">
-                {format(toDate(hackathon.startDate), 'MMM dd, yyyy')} - {format(toDate(hackathon.endDate), 'MMM dd, yyyy')}
+                {formatDate(hackathon.startDate)} - {formatDate(hackathon.endDate)}
               </span>
             </div>
             <div className="flex items-center space-x-2 text-gray-600">

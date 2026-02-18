@@ -30,5 +30,23 @@ export const userProfileService = {
       achievements: response.data.achievements || [],
       badges: response.data.badges || []
     };
+  },
+
+  getUserParticipations: async (userId: string): Promise<any[]> => {
+    const response = await apiRequest(
+      `${API_CONFIG.ENDPOINTS.USER.BASE}/${userId}/participations`,
+      {},
+      true
+    );
+    return response.data.participations || [];
+  },
+
+  searchUsers: async (query: string): Promise<User[]> => {
+    const response = await apiRequest(
+      `${API_CONFIG.ENDPOINTS.USER.SEARCH}?query=${encodeURIComponent(query)}`,
+      {},
+      true
+    );
+    return response.data.users || [];
   }
 };

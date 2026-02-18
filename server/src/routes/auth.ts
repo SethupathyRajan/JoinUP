@@ -21,7 +21,8 @@ const router = express.Router();
 // Register a new student
 router.post('/register', validate(registerSchema), async (req, res) => {
   try {
-    const { email, password, name, department, year, rollNumber, registerNumber, phoneNumber } = req.body;
+    const { email: rawEmail, password, name, department, year, rollNumber, registerNumber, phoneNumber } = req.body;
+    const email = rawEmail.toLowerCase();
 
     // Check if user already exists in Firestore
     const existingUserQuery = await db.collection('users')
@@ -142,7 +143,8 @@ router.post('/register', validate(registerSchema), async (req, res) => {
 // Login endpoint (verification only - actual login handled by Firebase Auth on frontend)
 router.post('/login', validate(loginSchema), async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email: rawEmail, password } = req.body;
+    const email = rawEmail.toLowerCase();
 
     // Verify user exists in our system
     const userQuery = await db.collection('users')
@@ -200,7 +202,8 @@ router.post('/login', validate(loginSchema), async (req, res) => {
 // Send reset code for password reset
 router.post('/send-reset-code', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email: rawEmail } = req.body;
+    const email = rawEmail?.toLowerCase();
 
     if (!email) {
       return res.status(400).json({
@@ -226,10 +229,13 @@ router.post('/send-reset-code', async (req, res) => {
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
     const resetToken = generateResetToken();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const userId = userQuery.docs[0].id;
 
     // Store reset code in database
     await db.collection('passwordResets').doc(resetToken).set({
+      userId,
       email,
+      token: resetToken,
       code: resetCode,
       used: false,
       createdAt: new Date(),
@@ -268,7 +274,8 @@ router.post('/send-reset-code', async (req, res) => {
 // Verify reset code
 router.post('/verify-reset-code', async (req, res) => {
   try {
-    const { email, code } = req.body;
+    const { email: rawEmail, code } = req.body;
+    const email = rawEmail?.toLowerCase();
 
     if (!email || !code) {
       return res.status(400).json({
@@ -278,24 +285,45 @@ router.post('/verify-reset-code', async (req, res) => {
     }
 
     // Find reset code in database
+    // Simplify query to avoid requiring composite indexes (email, code, used, expiresAt)
     const resetQuery = await db.collection('passwordResets')
       .where('email', '==', email)
       .where('code', '==', code)
-      .where('used', '==', false)
-      .where('expiresAt', '>', new Date())
       .limit(1)
       .get();
 
     if (resetQuery.empty) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid or expired verification code'
+        error: 'Invalid verification code'
       });
     }
 
-    const response: ApiResponse<{ message: string }> = {
+    const resetDoc = resetQuery.docs[0];
+    const resetData = resetDoc.data();
+
+    // Check used status and expiration in memory
+    if (resetData.used) {
+      return res.status(400).json({
+        success: false,
+        error: 'Verification code has already been used'
+      });
+    }
+
+    const expiresAt = resetData.expiresAt?.toDate ? resetData.expiresAt.toDate() : new Date(0);
+    if (expiresAt < new Date()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Verification code has expired'
+      });
+    }
+
+    const response: ApiResponse<{ message: string; token: string }> = {
       success: true,
-      data: { message: 'Verification code is valid' },
+      data: {
+        message: 'Verification code is valid',
+        token: resetDoc.id
+      },
       message: 'Code verified successfully'
     };
 
@@ -310,84 +338,8 @@ router.post('/verify-reset-code', async (req, res) => {
   }
 });
 
-// Reset password with verification code
-router.post('/reset-password', async (req, res) => {
-  try {
-    const { email, code, newPassword } = req.body;
 
-    if (!email || !code || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email, verification code, and new password are required'
-      });
-    }
-
-    // Find and verify reset code
-    const resetQuery = await db.collection('passwordResets')
-      .where('email', '==', email)
-      .where('code', '==', code)
-      .where('used', '==', false)
-      .where('expiresAt', '>', new Date())
-      .limit(1)
-      .get();
-
-    if (resetQuery.empty) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid or expired verification code'
-      });
-    }
-
-    // Get user from Firebase Auth
-    const userRecord = await adminAuth.getUserByEmail(email);
-
-    // Update password in Firebase Auth
-    await adminAuth.updateUser(userRecord.uid, {
-      password: newPassword
-    });
-
-    // Mark reset code as used
-    const resetDoc = resetQuery.docs[0];
-    await resetDoc.ref.update({
-      used: true,
-      usedAt: new Date()
-    });
-
-    // Update user's updatedAt timestamp
-    await db.collection('users').doc(userRecord.uid).update({
-      updatedAt: new Date()
-    });
-
-    // Send confirmation email
-    const userDoc = await db.collection('users').doc(userRecord.uid).get();
-    const userData = userDoc.data() as User;
-
-    await sendEmail({
-      to: email,
-      subject: 'Password Reset Successful - JoinUP',
-      template: 'password-reset-success',
-      context: {
-        userName: userData.name,
-        resetDate: new Date().toLocaleString()
-      }
-    });
-
-    const response: ApiResponse<{ message: string }> = {
-      success: true,
-      data: { message: 'Password reset successfully' },
-      message: 'Your password has been reset successfully. You can now login with your new password.'
-    };
-
-    res.json(response);
-
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to reset password'
-    });
-  }
-});
+// REDUNDANT ROUTE REMOVED
 
 // Update user profile with password verification
 router.put('/update-profile', authenticateToken, async (req, res) => {
@@ -609,7 +561,8 @@ router.post('/reset-password',
   validate(resetPasswordSchema),
   async (req, res) => {
     try {
-      const { token, newPassword } = req.body;
+      const { email: rawEmail, token, newPassword } = req.body;
+      const email = rawEmail?.toLowerCase();
 
       // Verify reset token
       const resetDoc = await db.collection('passwordResets')
@@ -628,7 +581,8 @@ router.post('/reset-password',
       const resetData = resetDoc.docs[0].data();
 
       // Check if token has expired
-      if (new Date() > resetData.expiresAt.toDate()) {
+      const expiresAt = resetData.expiresAt?.toDate ? resetData.expiresAt.toDate() : new Date(0);
+      if (new Date() > expiresAt) {
         return res.status(400).json({
           success: false,
           error: 'Reset token has expired'
@@ -657,7 +611,7 @@ router.post('/reset-password',
         template: 'password-reset-success',
         context: {
           userName: userData.name,
-          resetTime: new Date().toLocaleString(),
+          resetDate: new Date().toLocaleString(),
           loginUrl: `${process.env.CLIENT_URL}/login`
         }
       });

@@ -22,7 +22,7 @@ export const hackathonService = {
         createdBy: 'system',
         createdAt: now,
         updatedAt: now,
-  tags: ['sample', 'test'],
+        tags: ['sample', 'test'],
         prizeMoney: 10000,
         location: 'Online',
         requirements: ['No requirement'],
@@ -54,6 +54,7 @@ export const hackathonService = {
     try {
       const listRes = await apiRequest(API_CONFIG.ENDPOINTS.HACKATHON.LIST, {}, true);
       const hackathons = listRes.data?.hackathons || [];
+<<<<<<< HEAD
         if (hackathons && hackathons.length > 0) {
           const found = hackathons.find((h: Hackathon) => h.id === id);
           if (found) return found as Hackathon;
@@ -63,6 +64,17 @@ export const hackathonService = {
           const found = (fallback || []).find((h: Hackathon) => h.id === id);
           if (found) return found as Hackathon;
         }
+=======
+      if (hackathons && hackathons.length > 0) {
+        const found = hackathons.find((h: any) => h.id === id);
+        if (found) return found as Hackathon;
+      } else {
+        // if list returns empty, reuse getAllHackathons local fallback (call directly)
+        const fallback = await hackathonService.getAllHackathons();
+        const found = (fallback || []).find((h: any) => h.id === id);
+        if (found) return found as Hackathon;
+      }
+>>>>>>> 9fb7cc7 (chore: refoctor the file upload system from gcp to cloudinary)
     } catch (e) {
       console.debug('Fallback list fetch failed:', e);
     }
@@ -99,5 +111,17 @@ export const hackathonService = {
     await apiRequest(API_CONFIG.ENDPOINTS.HACKATHON.DELETE(id), {
       method: 'DELETE',
     }, true);
+  },
+
+  // Review hackathon (approve/reject - admin only)
+  reviewHackathon: async (id: string, status: 'upcoming' | 'rejected', remarks?: string): Promise<any> => {
+    const response = await apiRequest(`${API_CONFIG.ENDPOINTS.HACKATHON.BASE}/${id}/review`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status, remarks }),
+    }, true);
+    return response.data;
   },
 };

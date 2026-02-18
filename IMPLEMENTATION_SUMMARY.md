@@ -17,7 +17,7 @@
   - **Loading states** during search
   - **Prevents duplicate additions** and self-addition
 - ✅ Team leader display (current user) with special styling
-- ✅ Team size validation and display
+- ✅ Team size validation and display 
 - ✅ Enhanced file upload with:
   - Drag and drop interface
   - File preview for images

@@ -42,7 +42,7 @@ export const NotificationList: React.FC = () => {
 
   const handleMarkAsRead = async (notificationId: string) => {
     if (markingRead.includes(notificationId)) return;
-    
+
     try {
       setMarkingRead(prev => [...prev, notificationId]);
       await notificationService.markAsRead([notificationId]);
@@ -79,7 +79,7 @@ export const NotificationList: React.FC = () => {
     if (!notification.isRead) {
       handleMarkAsRead(notification.id);
     }
-    
+
     if (notification.actionUrl) {
       navigate(notification.actionUrl);
     }
@@ -138,21 +138,19 @@ export const NotificationList: React.FC = () => {
           <div className="flex space-x-2">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === 'all'
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'all'
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               All
             </button>
             <button
               onClick={() => setFilter('unread')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filter === 'unread'
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === 'unread'
                   ? 'bg-blue-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               Unread {unreadCount > 0 && `(${unreadCount})`}
             </button>
@@ -193,9 +191,8 @@ export const NotificationList: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => handleNotificationClick(notification)}
-              className={`bg-white rounded-xl shadow-sm border-l-4 cursor-pointer hover:shadow-md transition-all ${
-                !notification.isRead ? getNotificationColor(notification.type) : 'border-gray-200'
-              }`}
+              className={`bg-white rounded-xl shadow-sm border-l-4 cursor-pointer hover:shadow-md transition-all ${!notification.isRead ? getNotificationColor(notification.type) : 'border-gray-200'
+                }`}
             >
               <div className="p-6">
                 <div className="flex items-start space-x-4">
@@ -205,16 +202,34 @@ export const NotificationList: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className={`text-lg font-semibold mb-1 ${
-                          !notification.isRead ? 'text-gray-900' : 'text-gray-700'
-                        }`}>
+                        <h3 className={`text-lg font-semibold mb-1 ${!notification.isRead ? 'text-gray-900' : 'text-gray-700'
+                          }`}>
                           {notification.title}
                         </h3>
                         <p className="text-gray-600 mb-2">{notification.message}</p>
                         <div className="flex items-center space-x-4 text-sm text-gray-400">
-                          <span>{format(new Date(notification.createdAt), 'MMM dd, yyyy')}</span>
-                          <span>•</span>
-                          <span>{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
+                          {(() => {
+                            try {
+                              // Handle Firestore Timestamp or string dates safely
+                              const dateVal = notification.createdAt;
+                              const dateObj = dateVal && typeof dateVal === 'object' && 'toDate' in dateVal
+                                ? (dateVal as any).toDate()
+                                : new Date(dateVal);
+
+                              // Check if valid
+                              if (isNaN(dateObj.getTime())) return <span>Invalid Date</span>;
+
+                              return (
+                                <>
+                                  <span>{format(dateObj, 'MMM dd, yyyy')}</span>
+                                  <span>•</span>
+                                  <span>{formatDistanceToNow(dateObj, { addSuffix: true })}</span>
+                                </>
+                              );
+                            } catch (e) {
+                              return <span>Date Error</span>;
+                            }
+                          })()}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
